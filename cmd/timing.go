@@ -3,63 +3,66 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"sync"
+	"strings"
 	"time"
 
-	"github.com/itsgomes/aej-cli/internal/config"
-	jiraclient "github.com/itsgomes/aej-cli/internal/jira"
+	"github.com/itsgomes/aej-cli/internal/cli"
+	"github.com/spf13/cobra"
 )
 
-type requestTimingReporter struct {
+type commandTimingReporter struct {
 	enabled bool
 	output  func() io.Writer
-	mutex   sync.Mutex
 }
 
-func newRequestTimingReporter(output func() io.Writer) *requestTimingReporter {
-	return &requestTimingReporter{output: output}
+func newCommandTimingReporter(output func() io.Writer) *commandTimingReporter {
+	return &commandTimingReporter{output: output}
 }
 
-func (reporter *requestTimingReporter) Observe(metric jiraclient.RequestMetric) {
-	if !reporter.enabled {
+func (reporter *commandTimingReporter) Wrap(command *cobra.Command) {
+	originalRunE := command.RunE
+
+	if originalRunE == nil {
 		return
 	}
 
-	reporter.mutex.Lock()
-	defer reporter.mutex.Unlock()
+	command.RunE = func(cmd *cobra.Command, args []string) error {
+		if !reporter.enabled {
+			return originalRunE(cmd, args)
+		}
 
-	duration := metric.Duration.Round(time.Millisecond)
+		startedAt := time.Now()
 
-	if duration == 0 && metric.Duration > 0 {
-		duration = metric.Duration.Round(time.Microsecond)
+		defer func() {
+			elapsed := time.Since(startedAt)
+
+			printer := cli.NewPrinter(reporter.output(), reporter.output())
+
+			printer.Printf(
+				"%s %s %s\n",
+				cli.Colorize(cli.Cyan, "⏱"),
+				cli.Colorize(cli.Gray, "Tempo de execução:"),
+				cli.Colorize(cli.Bold+cli.Cyan, formatCommandDuration(elapsed)),
+			)
+		}()
+
+		return originalRunE(cmd, args)
 	}
-
-	fmt.Fprintf(
-		reporter.output(),
-		"⏱ %s %s — status %d — %s — tentativa %d\n",
-		metric.Method,
-		metric.Path,
-		metric.StatusCode,
-		duration,
-		metric.Attempt,
-	)
 }
 
-func withRequestObserver(deps Dependencies, observer jiraclient.RequestObserver) Dependencies {
-	originalNewService := deps.NewService
-	originalNewAuthenticator := deps.NewAuthenticator
+func formatCommandDuration(duration time.Duration) string {
+	if duration < time.Second {
+		milliseconds := duration.Round(time.Millisecond)
 
-	deps.NewService = func(cfg *config.Config, options ...jiraclient.Option) Service {
-		options = append(options, jiraclient.WithRequestObserver(observer))
+		if milliseconds == 0 {
+			return "<1 ms"
+		}
 
-		return originalNewService(cfg, options...)
+		return fmt.Sprintf("%d ms", milliseconds/time.Millisecond)
 	}
 
-	deps.NewAuthenticator = func(cfg *config.Config, options ...jiraclient.Option) Authenticator {
-		options = append(options, jiraclient.WithRequestObserver(observer))
+	seconds := fmt.Sprintf("%.1f", duration.Seconds())
+	seconds = strings.Replace(seconds, ".", ",", 1)
 
-		return originalNewAuthenticator(cfg, options...)
-	}
-
-	return deps
+	return seconds + " s"
 }
