@@ -19,6 +19,7 @@ type JiraGateway interface {
 	SearchIssues(context.Context, string, []string, int) ([]models.Issue, error)
 	GetIssue(context.Context, string) (*models.Issue, error)
 	GetBoards(context.Context) ([]models.Board, error)
+	GetBoardIssues(context.Context, int, string, []string, int) ([]models.Issue, error)
 	GetActiveSprint(context.Context, int) (*models.Sprint, error)
 	GetSprintIssues(context.Context, int) ([]models.Issue, error)
 	AddWorklog(context.Context, string, string, string, string) error
@@ -100,6 +101,18 @@ func (s *JiraService) SearchIssues(ctx context.Context, query string) ([]models.
 	}
 
 	return issues, nil
+}
+
+func (s *JiraService) GetBoards(ctx context.Context) ([]models.Board, error) {
+	return s.client.GetBoards(ctx)
+}
+
+func (s *JiraService) GetBoardIssues(ctx context.Context, boardID int) ([]models.Issue, error) {
+	if boardID <= 0 {
+		return nil, errors.New("o ID do board deve ser maior que zero")
+	}
+
+	return s.client.GetBoardIssues(ctx, boardID, "statusCategory != Done ORDER BY updated DESC", []string{"summary", "status", "priority", "issuetype"}, 50)
 }
 
 func (s *JiraService) GetActiveSprint(ctx context.Context) (*models.SprintStats, error) {
@@ -234,18 +247,20 @@ func (s *JiraService) fetchIssueWorklogs(ctx context.Context, issues []models.Is
 	var firstErr error
 	var errOnce sync.Once
 
+issueLoop:
 	for index, issue := range issues {
 		select {
 		case semaphore <- struct{}{}:
 		case <-ctx.Done():
-			break
+			break issueLoop
 		}
 
 		if ctx.Err() != nil {
-			break
+			break issueLoop
 		}
 
 		waitGroup.Add(1)
+
 		go func() {
 			defer waitGroup.Done()
 			defer func() { <-semaphore }()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -12,22 +13,28 @@ import (
 )
 
 type fakeJiraGateway struct {
-	currentUser    *models.User
-	count          int
-	searchIssues   []models.Issue
-	searchJQL      string
-	searchLimit    int
-	issue          *models.Issue
-	issueKey       string
-	boards         []models.Board
-	activeSprints  map[int]*models.Sprint
-	sprintIssues   []models.Issue
-	issueWorklogs  map[string][]models.Worklog
-	getWorklogs    func(context.Context, string) ([]models.Worklog, error)
-	worklogIssue   string
-	worklogTime    string
-	worklogComment string
-	worklogStarted string
+	currentUser       *models.User
+	count             int
+	searchIssues      []models.Issue
+	searchJQL         string
+	searchLimit       int
+	issue             *models.Issue
+	issueKey          string
+	boards            []models.Board
+	boardIssues       []models.Issue
+	boardIssuesErr    error
+	boardIssuesID     int
+	boardIssuesJQL    string
+	boardIssuesFields []string
+	boardIssuesLimit  int
+	activeSprints     map[int]*models.Sprint
+	sprintIssues      []models.Issue
+	issueWorklogs     map[string][]models.Worklog
+	getWorklogs       func(context.Context, string) ([]models.Worklog, error)
+	worklogIssue      string
+	worklogTime       string
+	worklogComment    string
+	worklogStarted    string
 }
 
 var _ JiraGateway = (*fakeJiraGateway)(nil)
@@ -55,6 +62,15 @@ func (f *fakeJiraGateway) GetBoards(context.Context) ([]models.Board, error) {
 	return f.boards, nil
 }
 
+func (f *fakeJiraGateway) GetBoardIssues(_ context.Context, boardID int, jql string, fields []string, limit int) ([]models.Issue, error) {
+	f.boardIssuesID = boardID
+	f.boardIssuesJQL = jql
+	f.boardIssuesFields = fields
+	f.boardIssuesLimit = limit
+
+	return f.boardIssues, f.boardIssuesErr
+}
+
 func (f *fakeJiraGateway) GetActiveSprint(_ context.Context, boardID int) (*models.Sprint, error) {
 	return f.activeSprints[boardID], nil
 }
@@ -76,6 +92,61 @@ func (f *fakeJiraGateway) GetIssueWorklogs(ctx context.Context, issueKey string)
 		return f.getWorklogs(ctx, issueKey)
 	}
 	return f.issueWorklogs[issueKey], nil
+}
+
+func TestJiraServiceGetBoardIssuesAppliesFilterAndLimit(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{
+		boardIssues: []models.Issue{
+			{Key: "AEJ-10"},
+			{Key: "AEJ-20"},
+		},
+	}
+
+	service := New(gateway)
+
+	issues, err := service.GetBoardIssues(context.Background(), 1712)
+
+	if err != nil {
+		t.Fatalf("GetBoardIssues() error = %v", err)
+	}
+
+	if len(issues) != 2 {
+		t.Fatalf("len(issues) = %d, want 2", len(issues))
+	}
+
+	if gateway.boardIssuesID != 1712 {
+		t.Errorf("board ID = %d, want 1712", gateway.boardIssuesID)
+	}
+
+	wantJQL := "statusCategory != Done ORDER BY updated DESC"
+
+	if gateway.boardIssuesJQL != wantJQL {
+		t.Errorf("jql = %q, want %q", gateway.boardIssuesJQL, wantJQL)
+	}
+
+	wantFields := []string{"summary", "status", "priority", "issuetype"}
+
+	if !slices.Equal(gateway.boardIssuesFields, wantFields) {
+		t.Errorf("fields = %v, want %v", gateway.boardIssuesFields, wantFields)
+	}
+
+	if gateway.boardIssuesLimit != 50 {
+		t.Errorf("limit = %d, want 50", gateway.boardIssuesLimit)
+	}
+}
+
+func TestJiraServiceGetBoardIssuesRejectsInvalidID(t *testing.T) {
+	t.Parallel()
+
+	service := New(&fakeJiraGateway{})
+
+	_, err := service.GetBoardIssues(context.Background(), 0)
+
+	if err == nil {
+		t.Fatal("GetBoardIssues() error = nil, want invalid board ID error")
+	}
 }
 
 func TestJiraServiceGetActiveSprintCalculatesStats(t *testing.T) {

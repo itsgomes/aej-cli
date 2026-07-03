@@ -30,6 +30,7 @@ func NewRootCommand(deps Dependencies) *cobra.Command {
 
 	commands := []*cobra.Command{
 		newLoginCommand(deps),
+		newBoardCommand(deps),
 		newMeCommand(deps),
 		newMineCommand(deps),
 		newSearchCommand(deps),

@@ -288,6 +288,78 @@ func (c *Client) GetBoards(ctx context.Context) ([]models.Board, error) {
 	}
 }
 
+func (c *Client) GetBoardIssues(ctx context.Context, boardID int, jql string, fields []string, limit int) ([]models.Issue, error) {
+	if boardID <= 0 {
+		return nil, errors.New("o ID do board deve ser maior que zero")
+	}
+
+	if limit < 0 {
+		return nil, errors.New("o limite da busca não pode ser negativo")
+	}
+
+	pageSize := defaultPageSize
+
+	if limit > 0 && limit < pageSize {
+		pageSize = limit
+	}
+
+	issues := make([]models.Issue, 0, pageSize)
+	nextPageToken := ""
+
+	for {
+		var page searchPage
+
+		requestPageSize := pageSize
+
+		if limit > 0 && limit-len(issues) < requestPageSize {
+			requestPageSize = limit - len(issues)
+		}
+
+		request := c.http.R().
+			SetContext(ctx).
+			SetQueryParams(map[string]string{
+				"jql":        jql,
+				"fields":     strings.Join(fields, ","),
+				"maxResults": strconv.Itoa(requestPageSize),
+			}).
+			SetResult(&page)
+
+		if nextPageToken != "" {
+			request.SetQueryParam("nextPageToken", nextPageToken)
+		}
+
+		resp, err := request.Get(fmt.Sprintf("/rest/software/1.0/board/%d/issue", boardID))
+
+		if err != nil {
+			return nil, fmt.Errorf("erro de rede: %w", err)
+		}
+
+		if err := handleResponse(resp); err != nil {
+			return nil, err
+		}
+
+		issues = append(issues, page.Issues...)
+
+		if limit > 0 && len(issues) >= limit {
+			return issues[:limit], nil
+		}
+
+		if page.IsLast {
+			return issues, nil
+		}
+
+		if page.NextPageToken == "" {
+			return nil, errors.New("resposta de issues do board inválida: próxima página sem token")
+		}
+
+		if page.NextPageToken == nextPageToken {
+			return nil, errors.New("resposta de issues do board inválida: token de paginação repetido")
+		}
+
+		nextPageToken = page.NextPageToken
+	}
+}
+
 func (c *Client) GetActiveSprint(ctx context.Context, boardID int) (*models.Sprint, error) {
 	var result models.SprintResult
 

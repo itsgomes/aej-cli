@@ -14,6 +14,8 @@ type Service interface {
 	GetMyIssues(context.Context) ([]models.Issue, error)
 	GetIssue(context.Context, string) (*models.Issue, error)
 	SearchIssues(context.Context, string) ([]models.Issue, error)
+	GetBoards(context.Context) ([]models.Board, error)
+	GetBoardIssues(context.Context, int) ([]models.Issue, error)
 	GetActiveSprint(context.Context) (*models.SprintStats, error)
 	AddWorklog(context.Context, string, string, string) error
 	GetWeeklyWorklogs(context.Context) ([]models.IssueWorklogSummary, int, error)

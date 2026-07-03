@@ -13,15 +13,19 @@ import (
 )
 
 type fakeService struct {
-	currentUser *models.User
-	openCount   int
-	myIssues    []models.Issue
-	issue       *models.Issue
-	issueErr    error
-	search      []models.Issue
-	sprint      *models.SprintStats
-	weekly      []models.IssueWorklogSummary
-	weeklyTotal int
+	currentUser       *models.User
+	openCount         int
+	myIssues          []models.Issue
+	issue             *models.Issue
+	issueErr          error
+	search            []models.Issue
+	boards            []models.Board
+	boardIssues       []models.Issue
+	boardIssuesID     int
+	boardIssuesCalled bool
+	sprint            *models.SprintStats
+	weekly            []models.IssueWorklogSummary
+	weeklyTotal       int
 }
 
 var _ Service = (*fakeService)(nil)
@@ -40,6 +44,17 @@ func (f *fakeService) GetIssue(context.Context, string) (*models.Issue, error) {
 
 func (f *fakeService) SearchIssues(context.Context, string) ([]models.Issue, error) {
 	return f.search, nil
+}
+
+func (f *fakeService) GetBoards(context.Context) ([]models.Board, error) {
+	return f.boards, nil
+}
+
+func (f *fakeService) GetBoardIssues(_ context.Context, boardID int) ([]models.Issue, error) {
+	f.boardIssuesCalled = true
+	f.boardIssuesID = boardID
+
+	return f.boardIssues, nil
 }
 
 func (f *fakeService) GetActiveSprint(context.Context) (*models.SprintStats, error) {
@@ -125,6 +140,88 @@ func TestLoginCommandUsesInjectedAuthenticatorAndStore(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Ada") || !strings.Contains(stdout, "Configuração salva") {
 		t.Errorf("stdout = %q, want successful greeting", stdout)
+	}
+}
+
+func TestBoardCommandRendersInjectedBoards(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{
+		boards: []models.Board{
+			{ID: 1712, Name: "Produto Principal", Type: "scrum"},
+			{ID: 1840, Name: "Sustentação", Type: "kanban"},
+		},
+	}
+
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"board"}, "")
+
+	if err != nil {
+		t.Fatalf("board error = %v", err)
+	}
+
+	if !strings.Contains(stdout, "1712") ||
+		!strings.Contains(stdout, "Produto Principal") ||
+		!strings.Contains(stdout, "scrum") {
+		t.Errorf("stdout = %q, want injected boards", stdout)
+	}
+}
+
+func TestBoardCommandRendersInjectedIssues(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{
+		boardIssues: []models.Issue{
+			{
+				Key: "AEJ-42",
+				Fields: models.IssueFields{
+					Summary: "Implementar comando board",
+					Status: models.Status{
+						Name: "Em andamento",
+						StatusCategory: models.StatusCategory{
+							Key: "indeterminate",
+						},
+					},
+					Priority: &models.Priority{
+						Name: "High",
+					},
+				},
+			},
+		},
+	}
+
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"board", "1712"}, "")
+
+	if err != nil {
+		t.Fatalf("board error = %v", err)
+	}
+
+	if !service.boardIssuesCalled {
+		t.Fatal("GetBoardIssues() was not called")
+	}
+
+	if service.boardIssuesID != 1712 {
+		t.Errorf("board ID = %d, want 1712", service.boardIssuesID)
+	}
+
+	if !strings.Contains(stdout, "AEJ-42") ||
+		!strings.Contains(stdout, "Implementar comando board") {
+		t.Errorf("stdout = %q, want injected board issue", stdout)
+	}
+}
+
+func TestBoardCommandRejectsInvalidID(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{}
+
+	_, _, err := executeForTest(t, testDependencies(service), []string{"board", "abc"}, "")
+
+	if err == nil {
+		t.Fatal("board error = nil, want invalid ID error")
+	}
+
+	if service.boardIssuesCalled {
+		t.Error("GetBoardIssues() was called with an invalid ID")
 	}
 }
 

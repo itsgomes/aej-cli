@@ -447,6 +447,104 @@ func TestClientGetBoardsFollowsOffsetPagination(t *testing.T) {
 	}
 }
 
+func TestClientGetBoardIssuesFollowsTokenPagination(t *testing.T) {
+	t.Parallel()
+
+	var gotPaths []string
+	var gotTokens []string
+	var gotMaxResults []string
+	var gotJQL string
+	var gotFields string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		token := query.Get("nextPageToken")
+
+		gotPaths = append(gotPaths, r.URL.Path)
+		gotTokens = append(gotTokens, token)
+		gotMaxResults = append(gotMaxResults, query.Get("maxResults"))
+		gotJQL = query.Get("jql")
+		gotFields = query.Get("fields")
+
+		w.Header().Set("Content-Type", "application/json")
+
+		switch token {
+		case "":
+			_, _ = w.Write([]byte(`{
+				"issues": [
+					{"key": "AEJ-1", "fields": {"summary": "Primeira issue"}},
+					{"key": "AEJ-2", "fields": {"summary": "Segunda issue"}}
+				],
+				"nextPageToken": "page-2",
+				"isLast": false
+			}`))
+
+		case "page-2":
+			_, _ = w.Write([]byte(`{
+				"issues": [
+					{"key": "AEJ-3", "fields": {"summary": "Terceira issue"}}
+				],
+				"isLast": true
+			}`))
+
+		default:
+			http.Error(w, "unexpected token", http.StatusBadRequest)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := New(&config.Config{JiraURL: server.URL})
+
+	issues, err := client.GetBoardIssues(
+		context.Background(),
+		1712,
+		"statusCategory != Done ORDER BY updated DESC",
+		[]string{"summary", "status", "priority", "issuetype"},
+		3,
+	)
+
+	if err != nil {
+		t.Fatalf("GetBoardIssues() error = %v", err)
+	}
+
+	if len(issues) != 3 {
+		t.Fatalf("len(issues) = %d, want 3", len(issues))
+	}
+
+	if issues[0].Key != "AEJ-1" || issues[2].Key != "AEJ-3" {
+		t.Errorf(
+			"issue keys = %q, %q, want AEJ-1, AEJ-3",
+			issues[0].Key,
+			issues[2].Key,
+		)
+	}
+
+	if len(gotPaths) != 2 ||
+		gotPaths[0] != "/rest/software/1.0/board/1712/issue" {
+		t.Errorf("paths = %v, want board issues endpoint", gotPaths)
+	}
+
+	if len(gotTokens) != 2 ||
+		gotTokens[0] != "" ||
+		gotTokens[1] != "page-2" {
+		t.Errorf("tokens = %v, want [\"\" \"page-2\"]", gotTokens)
+	}
+
+	if len(gotMaxResults) != 2 ||
+		gotMaxResults[0] != "3" ||
+		gotMaxResults[1] != "1" {
+		t.Errorf("maxResults = %v, want [3 1]", gotMaxResults)
+	}
+
+	if gotJQL != "statusCategory != Done ORDER BY updated DESC" {
+		t.Errorf("jql = %q, want open issues ordered by update", gotJQL)
+	}
+
+	if gotFields != "summary,status,priority,issuetype" {
+		t.Errorf("fields = %q, want requested issue fields", gotFields)
+	}
+}
+
 func TestClientGetIssueWorklogsFollowsOffsetPagination(t *testing.T) {
 	t.Parallel()
 
