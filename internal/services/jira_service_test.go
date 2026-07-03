@@ -27,8 +27,6 @@ type fakeJiraGateway struct {
 	boardIssuesJQL    string
 	boardIssuesFields []string
 	boardIssuesLimit  int
-	activeSprints     map[int]*models.Sprint
-	sprintIssues      []models.Issue
 	issueWorklogs     map[string][]models.Worklog
 	getWorklogs       func(context.Context, string) ([]models.Worklog, error)
 	worklogIssue      string
@@ -69,14 +67,6 @@ func (f *fakeJiraGateway) GetBoardIssues(_ context.Context, boardID int, jql str
 	f.boardIssuesLimit = limit
 
 	return f.boardIssues, f.boardIssuesErr
-}
-
-func (f *fakeJiraGateway) GetActiveSprint(_ context.Context, boardID int) (*models.Sprint, error) {
-	return f.activeSprints[boardID], nil
-}
-
-func (f *fakeJiraGateway) GetSprintIssues(context.Context, int) ([]models.Issue, error) {
-	return f.sprintIssues, nil
 }
 
 func (f *fakeJiraGateway) AddWorklog(_ context.Context, issueKey, timeSpent, comment, started string) error {
@@ -146,33 +136,6 @@ func TestJiraServiceGetBoardIssuesRejectsInvalidID(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("GetBoardIssues() error = nil, want invalid board ID error")
-	}
-}
-
-func TestJiraServiceGetActiveSprintCalculatesStats(t *testing.T) {
-	t.Parallel()
-
-	gateway := &fakeJiraGateway{
-		boards: []models.Board{{ID: 7, Name: "Engineering"}},
-		activeSprints: map[int]*models.Sprint{
-			7: {ID: 42, Name: "Sprint 42", State: "active"},
-		},
-		sprintIssues: []models.Issue{
-			{Key: "AEJ-1", Fields: issueFieldsWithStatusCategory("done")},
-			{Key: "AEJ-2", Fields: issueFieldsWithStatusCategory("indeterminate")},
-			{Key: "AEJ-3", Fields: issueFieldsWithStatusCategory("new")},
-			{Key: "AEJ-4", Fields: issueFieldsWithStatusCategory("new")},
-		},
-	}
-
-	service := New(gateway)
-	stats, err := service.GetActiveSprint(context.Background())
-	if err != nil {
-		t.Fatalf("GetActiveSprint() error = %v", err)
-	}
-
-	if stats.Total != 4 || stats.Done != 1 || stats.InProgress != 1 || stats.Todo != 2 {
-		t.Errorf("stats = %#v, want total=4 done=1 inProgress=1 todo=2", stats)
 	}
 }
 
@@ -335,13 +298,5 @@ func TestJiraServiceValidatesIssueKey(t *testing.T) {
 				t.Errorf("gateway key = %q, want %q", gateway.issueKey, tt.want)
 			}
 		})
-	}
-}
-
-func issueFieldsWithStatusCategory(category string) models.IssueFields {
-	return models.IssueFields{
-		Status: models.Status{
-			StatusCategory: models.StatusCategory{Key: category},
-		},
 	}
 }

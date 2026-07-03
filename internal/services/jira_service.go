@@ -20,8 +20,6 @@ type JiraGateway interface {
 	GetIssue(context.Context, string) (*models.Issue, error)
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int, string, []string, int) ([]models.Issue, error)
-	GetActiveSprint(context.Context, int) (*models.Sprint, error)
-	GetSprintIssues(context.Context, int) ([]models.Issue, error)
 	AddWorklog(context.Context, string, string, string, string) error
 	GetIssueWorklogs(context.Context, string) ([]models.Worklog, error)
 }
@@ -113,59 +111,6 @@ func (s *JiraService) GetBoardIssues(ctx context.Context, boardID int) ([]models
 	}
 
 	return s.client.GetBoardIssues(ctx, boardID, "statusCategory != Done ORDER BY updated DESC", []string{"summary", "status", "priority", "issuetype"}, 50)
-}
-
-func (s *JiraService) GetActiveSprint(ctx context.Context) (*models.SprintStats, error) {
-	boards, err := s.client.GetBoards(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("não foi possível obter os boards: %w", err)
-	}
-
-	if len(boards) == 0 {
-		return nil, errors.New("nenhum board foi encontrado")
-	}
-
-	for _, board := range boards {
-		sprint, err := s.client.GetActiveSprint(ctx, board.ID)
-
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return nil, err
-			}
-
-			continue
-		}
-
-		if sprint == nil {
-			continue
-		}
-
-		issues, err := s.client.GetSprintIssues(ctx, sprint.ID)
-		if err != nil {
-			return nil, fmt.Errorf("obter issues da sprint %q: %w", sprint.Name, err)
-		}
-
-		stats := &models.SprintStats{
-			Sprint: *sprint,
-			Total:  len(issues),
-		}
-
-		for _, issue := range issues {
-			switch issue.Fields.Status.StatusCategory.Key {
-			case "done":
-				stats.Done++
-			case "indeterminate":
-				stats.InProgress++
-			default:
-				stats.Todo++
-			}
-		}
-
-		return stats, nil
-	}
-
-	return nil, errors.New("nenhuma sprint ativa foi encontrada")
 }
 
 func (s *JiraService) AddWorklog(ctx context.Context, issueKey, timeSpent, comment string) error {

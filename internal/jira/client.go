@@ -360,30 +360,6 @@ func (c *Client) GetBoardIssues(ctx context.Context, boardID int, jql string, fi
 	}
 }
 
-func (c *Client) GetActiveSprint(ctx context.Context, boardID int) (*models.Sprint, error) {
-	var result models.SprintResult
-
-	resp, err := c.http.R().
-		SetContext(ctx).
-		SetQueryParam("state", "active").
-		SetResult(&result).
-		Get(fmt.Sprintf("/rest/agile/1.0/board/%d/sprint", boardID))
-
-	if err != nil {
-		return nil, fmt.Errorf("erro de rede: %w", err)
-	}
-
-	if err := handleResponse(resp); err != nil {
-		return nil, err
-	}
-
-	if len(result.Values) == 0 {
-		return nil, nil
-	}
-
-	return &result.Values[0], nil
-}
-
 func (c *Client) AddWorklog(ctx context.Context, issueKey, timeSpent, comment, started string) error {
 	body := map[string]any{
 		"timeSpent": timeSpent,
@@ -461,52 +437,6 @@ func buildADFComment(text string) *models.ADFDocument {
 				},
 			},
 		},
-	}
-}
-
-func (c *Client) GetSprintIssues(ctx context.Context, sprintID int) ([]models.Issue, error) {
-	issues := make([]models.Issue, 0, defaultPageSize)
-	nextPageToken := ""
-
-	for {
-		var page models.SprintIssuePage
-
-		request := c.http.R().
-			SetContext(ctx).
-			SetQueryParams(map[string]string{
-				"fields":     "summary,status",
-				"maxResults": fmt.Sprintf("%d", defaultPageSize),
-			}).
-			SetResult(&page)
-
-		if nextPageToken != "" {
-			request.SetQueryParam("nextPageToken", nextPageToken)
-		}
-
-		resp, err := request.Get(fmt.Sprintf("/rest/agile/1.0/sprint/%d/issue", sprintID))
-		if err != nil {
-			return nil, fmt.Errorf("erro de rede: %w", err)
-		}
-
-		if err := handleResponse(resp); err != nil {
-			return nil, err
-		}
-
-		issues = append(issues, page.Issues...)
-
-		if page.IsLast {
-			return issues, nil
-		}
-
-		if page.NextPageToken == "" {
-			return nil, errors.New("resposta de issues da sprint inválida: próxima página sem token")
-		}
-
-		if page.NextPageToken == nextPageToken {
-			return nil, errors.New("resposta de issues da sprint inválida: token de paginação repetido")
-		}
-
-		nextPageToken = page.NextPageToken
 	}
 }
 

@@ -1,6 +1,6 @@
 # AEJ
 
-AEJ is a small command-line interface for Jira. It lets you inspect issues and sprints, search for work, and manage worklogs directly from your terminal.
+AEJ is a small command-line interface for Jira. It lets you inspect issues and boards, search for work, and manage worklogs directly from your terminal.
 
 ## Tech Stack
 
@@ -63,7 +63,7 @@ Run `aej --help` to see all available commands.
 ## Notes
 
 - AEJ targets the Jira Cloud REST API v3. Jira Server and Data Center may require endpoint changes.
-- `aej sprint` requires Jira Software and access to the Agile API (`/rest/agile/1.0`).
+- `aej board` requires Jira Software and access to the board APIs.
 - The Jira URL must use HTTPS and contain only the scheme and host.
 - Terminal colors are disabled when output is redirected and when `NO_COLOR` is set.
 

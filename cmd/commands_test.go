@@ -23,7 +23,6 @@ type fakeService struct {
 	boardIssues       []models.Issue
 	boardIssuesID     int
 	boardIssuesCalled bool
-	sprint            *models.SprintStats
 	weekly            []models.IssueWorklogSummary
 	weeklyTotal       int
 }
@@ -55,10 +54,6 @@ func (f *fakeService) GetBoardIssues(_ context.Context, boardID int) ([]models.I
 	f.boardIssuesID = boardID
 
 	return f.boardIssues, nil
-}
-
-func (f *fakeService) GetActiveSprint(context.Context) (*models.SprintStats, error) {
-	return f.sprint, nil
 }
 
 func (f *fakeService) AddWorklog(context.Context, string, string, string) error {

@@ -42,24 +42,6 @@ type IssueType struct {
 	Name string `json:"name"`
 }
 
-type SprintIssuePage struct {
-	Issues        []Issue `json:"issues"`
-	NextPageToken string  `json:"nextPageToken"`
-	IsLast        bool    `json:"isLast"`
-}
-
-type Sprint struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	State     string `json:"state"`
-	StartDate string `json:"startDate"`
-	EndDate   string `json:"endDate"`
-}
-
-type SprintResult struct {
-	Values []Sprint `json:"values"`
-}
-
 type Board struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
@@ -72,14 +54,6 @@ type BoardResult struct {
 	MaxResults int     `json:"maxResults"`
 	Total      int     `json:"total"`
 	IsLast     bool    `json:"isLast"`
-}
-
-type SprintStats struct {
-	Sprint     Sprint
-	Total      int
-	Done       int
-	InProgress int
-	Todo       int
 }
 
 type Worklog struct {
