@@ -104,7 +104,7 @@ func TestLoginCommandUsesInjectedAuthenticatorAndStore(t *testing.T) {
 
 	var saved config.Config
 	deps := testDependencies(&fakeService{})
-	deps.NewAuthenticator = func(*config.Config) Authenticator {
+	deps.NewAuthenticator = func(*config.Config, ...jiraclient.Option) Authenticator {
 		return authenticatorFunc(func(context.Context) (*models.User, error) {
 			return &models.User{DisplayName: "Ada"}, nil
 		})
@@ -137,7 +137,7 @@ func TestCommandPropagatesConfigErrorWithoutBuildingService(t *testing.T) {
 	deps.LoadConfig = func() (*config.Config, error) {
 		return nil, wantErr
 	}
-	deps.NewService = func(*config.Config) Service {
+	deps.NewService = func(*config.Config, ...jiraclient.Option) Service {
 		serviceBuilt = true
 		return &fakeService{}
 	}
@@ -157,10 +157,10 @@ func testDependencies(service Service) Dependencies {
 			return &config.Config{JiraURL: "https://example.atlassian.net", Email: "dev@example.com", APIToken: "token"}, nil
 		},
 		SaveConfig: func(config.Config) error { return nil },
-		NewService: func(*config.Config) Service {
+		NewService: func(*config.Config, ...jiraclient.Option) Service {
 			return service
 		},
-		NewAuthenticator: func(*config.Config) Authenticator {
+		NewAuthenticator: func(*config.Config, ...jiraclient.Option) Authenticator {
 			return authenticatorFunc(func(context.Context) (*models.User, error) {
 				return &models.User{}, nil
 			})

@@ -17,6 +17,17 @@ func NewRootCommand(deps Dependencies) *cobra.Command {
 	Use 'aej login' para configurar suas credenciais.`,
 	}
 
+	reporter := newRequestTimingReporter(root.ErrOrStderr)
+
+	root.PersistentFlags().BoolVar(
+		&reporter.enabled,
+		"timing",
+		false,
+		"Exibir o tempo de resposta de cada requisição ao Jira",
+	)
+
+	deps = withRequestObserver(deps, reporter.Observe)
+
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.AddCommand(
 		newLoginCommand(deps),

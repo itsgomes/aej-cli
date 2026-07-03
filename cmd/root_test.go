@@ -93,3 +93,22 @@ func TestReadSecretUsesProvidedStreams(t *testing.T) {
 		t.Errorf("output = %q, want prompt", out.String())
 	}
 }
+
+func TestRootCommandHasTimingFlag(t *testing.T) {
+	t.Parallel()
+
+	root := NewRootCommand(defaultDependencies())
+
+	flag := root.PersistentFlags().Lookup("timing")
+
+	if flag == nil {
+		t.Fatal("timing flag was not registered")
+	}
+
+	if flag.DefValue != "false" {
+		t.Errorf(
+			"timing default value = %q, want false",
+			flag.DefValue,
+		)
+	}
+}

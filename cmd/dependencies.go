@@ -26,19 +26,19 @@ type Authenticator interface {
 type Dependencies struct {
 	LoadConfig       func() (*config.Config, error)
 	SaveConfig       func(config.Config) error
-	NewService       func(*config.Config) Service
-	NewAuthenticator func(*config.Config) Authenticator
+	NewService       func(*config.Config, ...jiraclient.Option) Service
+	NewAuthenticator func(*config.Config, ...jiraclient.Option) Authenticator
 }
 
 func defaultDependencies() Dependencies {
 	return Dependencies{
 		LoadConfig: config.Load,
 		SaveConfig: config.Save,
-		NewService: func(cfg *config.Config) Service {
-			return services.New(jiraclient.New(cfg))
+		NewService: func(cfg *config.Config, options ...jiraclient.Option) Service {
+			return services.New(jiraclient.New(cfg, options...))
 		},
-		NewAuthenticator: func(cfg *config.Config) Authenticator {
-			return jiraclient.New(cfg)
+		NewAuthenticator: func(cfg *config.Config, options ...jiraclient.Option) Authenticator {
+			return jiraclient.New(cfg, options...)
 		},
 	}
 }
