@@ -180,10 +180,13 @@ func TestJiraServiceGetWeeklyWorklogsFiltersAuthorAndDate(t *testing.T) {
 		},
 	}
 
+	from := time.Date(2026, time.June, 26, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.July, 3, 0, 0, 0, 0, time.UTC)
+
 	service := New(gateway, WithClock(func() time.Time { return fixedNow }))
-	summaries, totalSeconds, err := service.GetWeeklyWorklogs(context.Background())
+	summaries, totalSeconds, err := service.GetWorklogs(context.Background(), from, to)
 	if err != nil {
-		t.Fatalf("GetWeeklyWorklogs() error = %v", err)
+		t.Fatalf("GetWorklogs() error = %v", err)
 	}
 
 	if gateway.searchLimit != 0 {
@@ -224,12 +227,15 @@ func TestJiraServiceLimitsConcurrentWorklogRequests(t *testing.T) {
 		},
 	}
 
+	from := time.Date(2026, time.June, 26, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, time.July, 3, 0, 0, 0, 0, time.UTC)
+
 	service := New(gateway, WithClock(func() time.Time {
 		return time.Date(2026, time.July, 2, 12, 0, 0, 0, time.UTC)
 	}))
-	summaries, _, err := service.GetWeeklyWorklogs(context.Background())
+	summaries, _, err := service.GetWorklogs(context.Background(), from, to)
 	if err != nil {
-		t.Fatalf("GetWeeklyWorklogs() error = %v", err)
+		t.Fatalf("GetWorklogs() error = %v", err)
 	}
 
 	if got := maximum.Load(); got < 2 || got > maxConcurrentWorklogRequests {

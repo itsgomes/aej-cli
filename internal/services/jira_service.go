@@ -123,27 +123,40 @@ func (s *JiraService) AddWorklog(ctx context.Context, issueKey, timeSpent, comme
 	return s.client.AddWorklog(ctx, normalizedKey, timeSpent, comment, started)
 }
 
-func (s *JiraService) GetWeeklyWorklogs(ctx context.Context) ([]models.IssueWorklogSummary, int, error) {
+func (s *JiraService) GetWorklogs(ctx context.Context, from time.Time, to time.Time) ([]models.IssueWorklogSummary, int, error) {
+	if !from.Before(to) {
+		return nil, 0, errors.New("intervalo de datas inválido")
+	}
+
 	me, err := s.client.GetCurrentUser(ctx)
 
 	if err != nil {
 		return nil, 0, err
 	}
 
-	issues, err := s.client.SearchIssues(ctx, "worklogAuthor = currentUser() AND worklogDate >= -7d ORDER BY updated DESC", []string{"summary"}, 0)
+	firstDate := from.Format("2006-01-02")
+	lastDate := to.Add(-time.Nanosecond).Format("2006-01-02")
+
+	jql := fmt.Sprintf(
+		`worklogAuthor = currentUser() AND worklogDate >= "%s" AND worklogDate <= "%s" ORDER BY updated DESC`,
+		firstDate,
+		lastDate,
+	)
+
+	issues, err := s.client.SearchIssues(ctx, jql, []string{"summary"}, 0)
 
 	if err != nil {
 		return nil, 0, err
 	}
-
-	cutoff := s.now().AddDate(0, 0, -7)
-	var summaries []models.IssueWorklogSummary
-	totalSeconds := 0
 
 	worklogsByIssue, err := s.fetchIssueWorklogs(ctx, issues)
+
 	if err != nil {
 		return nil, 0, err
 	}
+
+	var summaries []models.IssueWorklogSummary
+	totalSeconds := 0
 
 	for index, issue := range issues {
 		worklogs := worklogsByIssue[index]
@@ -151,29 +164,40 @@ func (s *JiraService) GetWeeklyWorklogs(ctx context.Context) ([]models.IssueWork
 		var entries []models.Worklog
 		issueTotal := 0
 
-		for _, wl := range worklogs {
-
-			if wl.Author.AccountID != me.AccountID {
+		for _, worklog := range worklogs {
+			if worklog.Author.AccountID != me.AccountID {
 				continue
 			}
 
-			started, err := parseJiraDate(wl.Started)
+			started, err := parseJiraDate(worklog.Started)
 
-			if err != nil || started.Before(cutoff) {
+			if err != nil {
 				continue
 			}
 
-			entries = append(entries, wl)
-			issueTotal += wl.TimeSpentSeconds
+			if started.Before(from) {
+				continue
+			}
+
+			if !started.Before(to) {
+				continue
+			}
+
+			entries = append(entries, worklog)
+
+			issueTotal += worklog.TimeSpentSeconds
 		}
 
 		if issueTotal > 0 {
-			summaries = append(summaries, models.IssueWorklogSummary{
-				IssueKey: issue.Key,
-				Summary:  issue.Fields.Summary,
-				Total:    issueTotal,
-				Entries:  entries,
-			})
+			summaries = append(
+				summaries,
+				models.IssueWorklogSummary{
+					IssueKey: issue.Key,
+					Summary:  issue.Fields.Summary,
+					Total:    issueTotal,
+					Entries:  entries,
+				},
+			)
 
 			totalSeconds += issueTotal
 		}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/itsgomes/aej-cli/internal/config"
 	jiraclient "github.com/itsgomes/aej-cli/internal/jira"
@@ -60,7 +61,7 @@ func (f *fakeService) AddWorklog(context.Context, string, string, string) error 
 	return nil
 }
 
-func (f *fakeService) GetWeeklyWorklogs(context.Context) ([]models.IssueWorklogSummary, int, error) {
+func (f *fakeService) GetWorklogs(context.Context, time.Time, time.Time) ([]models.IssueWorklogSummary, int, error) {
 	return f.weekly, f.weeklyTotal, nil
 }
 

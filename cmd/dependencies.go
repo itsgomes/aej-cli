@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"time"
 
 	"github.com/itsgomes/aej-cli/internal/config"
 	jiraclient "github.com/itsgomes/aej-cli/internal/jira"
@@ -17,7 +18,7 @@ type Service interface {
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int) ([]models.Issue, error)
 	AddWorklog(context.Context, string, string, string) error
-	GetWeeklyWorklogs(context.Context) ([]models.IssueWorklogSummary, int, error)
+	GetWorklogs(context.Context, time.Time, time.Time) ([]models.IssueWorklogSummary, int, error)
 }
 
 type Authenticator interface {
