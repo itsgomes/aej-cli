@@ -127,6 +127,76 @@ func TestJiraServiceGetBoardIssuesAppliesFilterAndLimit(t *testing.T) {
 	}
 }
 
+func TestJiraServiceGetMyIssuesUsesOpenIssuesByDefault(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{searchIssues: []models.Issue{{Key: "AEJ-10"}}}
+
+	service := New(gateway)
+
+	issues, err := service.GetMyIssues(context.Background(), "")
+
+	if err != nil {
+		t.Fatalf("GetMyIssues() error = %v", err)
+	}
+
+	if len(issues) != 1 {
+		t.Fatalf("len(issues) = %d, want 1", len(issues))
+	}
+
+	wantJQL := "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+
+	if gateway.searchJQL != wantJQL {
+		t.Errorf("jql = %q, want %q", gateway.searchJQL, wantJQL)
+	}
+
+	if gateway.searchLimit != 50 {
+		t.Errorf("limit = %d, want 50", gateway.searchLimit)
+	}
+}
+
+func TestJiraServiceGetMyIssuesFiltersByStatus(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{
+		searchIssues: []models.Issue{
+			{
+				Key: "FD-4421",
+				Fields: models.IssueFields{
+					Status: models.Status{Name: "Dev. Aguardando Deploy"},
+				},
+			},
+			{
+				Key: "FD-4422",
+				Fields: models.IssueFields{
+					Status: models.Status{Name: "Dev. Em andamento"},
+				},
+			},
+		},
+	}
+	service := New(gateway)
+
+	issues, err := service.GetMyIssues(context.Background(), "deploy")
+
+	if err != nil {
+		t.Fatalf("GetMyIssues() error = %v", err)
+	}
+
+	wantJQL := "assignee = currentUser() ORDER BY updated DESC"
+
+	if gateway.searchJQL != wantJQL {
+		t.Errorf("jql = %q, want %q", gateway.searchJQL, wantJQL)
+	}
+
+	if gateway.searchLimit != 0 {
+		t.Errorf("limit = %d, want 0 to allow client-side status filtering", gateway.searchLimit)
+	}
+
+	if len(issues) != 1 || issues[0].Key != "FD-4421" {
+		t.Errorf("issues = %#v, want only FD-4421", issues)
+	}
+}
+
 func TestJiraServiceGetBoardIssuesRejectsInvalidID(t *testing.T) {
 	t.Parallel()
 
@@ -233,7 +303,9 @@ func TestJiraServiceLimitsConcurrentWorklogRequests(t *testing.T) {
 	service := New(gateway, WithClock(func() time.Time {
 		return time.Date(2026, time.July, 2, 12, 0, 0, 0, time.UTC)
 	}))
+
 	summaries, _, err := service.GetWorklogs(context.Background(), from, to)
+
 	if err != nil {
 		t.Fatalf("GetWorklogs() error = %v", err)
 	}
@@ -241,6 +313,7 @@ func TestJiraServiceLimitsConcurrentWorklogRequests(t *testing.T) {
 	if got := maximum.Load(); got < 2 || got > maxConcurrentWorklogRequests {
 		t.Errorf("maximum concurrency = %d, want between 2 and %d", got, maxConcurrentWorklogRequests)
 	}
+
 	if len(summaries) != len(issues) || summaries[0].IssueKey != "AEJ-1" || summaries[7].IssueKey != "AEJ-8" {
 		t.Errorf("summary order/count = %#v, want original issue order", summaries)
 	}

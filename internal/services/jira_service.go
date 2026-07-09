@@ -12,6 +12,7 @@ import (
 )
 
 const maxConcurrentWorklogRequests = 4
+const myIssuesLimit = 50
 
 type JiraGateway interface {
 	GetCurrentUser(context.Context) (*models.User, error)
@@ -65,14 +66,42 @@ func (s *JiraService) GetCurrentUserWithStats(ctx context.Context) (*models.User
 	return user, openCount, nil
 }
 
-func (s *JiraService) GetMyIssues(ctx context.Context) ([]models.Issue, error) {
-	issues, err := s.client.SearchIssues(ctx, "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC", []string{"summary", "status", "priority", "issuetype"}, 50)
+func (s *JiraService) GetMyIssues(ctx context.Context, status string) ([]models.Issue, error) {
+	status = strings.TrimSpace(status)
+
+	if status == "" {
+		issues, err := s.client.SearchIssues(ctx, "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC", []string{"summary", "status", "priority", "issuetype"}, myIssuesLimit)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return issues, nil
+	}
+
+	issues, err := s.client.SearchIssues(ctx, "assignee = currentUser() ORDER BY updated DESC", []string{"summary", "status", "priority", "issuetype"}, 0)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return issues, nil
+	filtered := make([]models.Issue, 0, myIssuesLimit)
+	for _, issue := range issues {
+		if !statusContains(issue.Fields.Status.Name, status) {
+			continue
+		}
+
+		filtered = append(filtered, issue)
+		if len(filtered) == myIssuesLimit {
+			break
+		}
+	}
+
+	return filtered, nil
+}
+
+func statusContains(statusName string, query string) bool {
+	return strings.Contains(strings.ToLower(statusName), strings.ToLower(query))
 }
 
 func (s *JiraService) GetIssue(ctx context.Context, key string) (*models.Issue, error) {

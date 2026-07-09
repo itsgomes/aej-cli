@@ -26,6 +26,7 @@ type fakeService struct {
 	boardIssuesCalled bool
 	weekly            []models.IssueWorklogSummary
 	weeklyTotal       int
+	myIssuesStatus    string
 }
 
 var _ Service = (*fakeService)(nil)
@@ -34,7 +35,9 @@ func (f *fakeService) GetCurrentUserWithStats(context.Context) (*models.User, in
 	return f.currentUser, f.openCount, nil
 }
 
-func (f *fakeService) GetMyIssues(context.Context) ([]models.Issue, error) {
+func (f *fakeService) GetMyIssues(_ context.Context, status string) ([]models.Issue, error) {
+	f.myIssuesStatus = status
+
 	return f.myIssues, nil
 }
 
@@ -93,6 +96,44 @@ func TestMineCommandRendersInjectedIssues(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "AEJ-42") || !strings.Contains(stdout, "Desacoplar comandos") {
 		t.Errorf("stdout = %q, want injected issue", stdout)
+	}
+}
+
+func TestMineCommandPassesStatusFilter(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{}
+
+	_, _, err := executeForTest(t, testDependencies(service), []string{"mine", "--status", "Em andamento"}, "")
+	if err != nil {
+		t.Fatalf("mine error = %v", err)
+	}
+	if service.myIssuesStatus != "Em andamento" {
+		t.Errorf("status = %q, want Em andamento", service.myIssuesStatus)
+	}
+}
+
+func TestMineCommandRendersDefaultEmptyMessage(t *testing.T) {
+	t.Parallel()
+
+	stdout, _, err := executeForTest(t, testDependencies(&fakeService{}), []string{"mine"}, "")
+	if err != nil {
+		t.Fatalf("mine error = %v", err)
+	}
+	if !strings.Contains(stdout, "Nenhuma issue aberta atribuída a você.") {
+		t.Errorf("stdout = %q, want default empty message", stdout)
+	}
+}
+
+func TestMineCommandRendersStatusEmptyMessage(t *testing.T) {
+	t.Parallel()
+
+	stdout, _, err := executeForTest(t, testDependencies(&fakeService{}), []string{"mine", "--status", "Em andamento"}, "")
+	if err != nil {
+		t.Fatalf("mine error = %v", err)
+	}
+	if !strings.Contains(stdout, "Nenhuma issue atribuída a você encontrada para o status informado.") {
+		t.Errorf("stdout = %q, want status empty message", stdout)
 	}
 }
 

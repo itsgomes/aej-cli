@@ -12,7 +12,7 @@ import (
 
 type Service interface {
 	GetCurrentUserWithStats(context.Context) (*models.User, int, error)
-	GetMyIssues(context.Context) ([]models.Issue, error)
+	GetMyIssues(context.Context, string) ([]models.Issue, error)
 	GetIssue(context.Context, string) (*models.Issue, error)
 	SearchIssues(context.Context, string) ([]models.Issue, error)
 	GetBoards(context.Context) ([]models.Board, error)
