@@ -13,6 +13,7 @@ import (
 
 const maxConcurrentWorklogRequests = 4
 const myIssuesLimit = 50
+const searchIssuesLimit = 20
 
 type JiraGateway interface {
 	GetCurrentUser(context.Context) (*models.User, error)
@@ -113,21 +114,64 @@ func (s *JiraService) GetIssue(ctx context.Context, key string) (*models.Issue, 
 	return s.client.GetIssue(ctx, normalizedKey)
 }
 
-func (s *JiraService) SearchIssues(ctx context.Context, query string) ([]models.Issue, error) {
+func (s *JiraService) SearchIssues(ctx context.Context, query string, tag string, version string) ([]models.Issue, error) {
 	query = strings.TrimSpace(query)
-	if query == "" {
+	tag = strings.TrimSpace(tag)
+	version = strings.TrimSpace(version)
+	if query == "" && tag == "" && version == "" {
 		return nil, ErrEmptySearchTerm
 	}
 
-	jql := fmt.Sprintf("text ~ %s ORDER BY updated DESC", jqlStringLiteral(query))
+	filters := make([]string, 0, 2)
+	if query != "" {
+		filters = append(filters, fmt.Sprintf("text ~ %s", jqlStringLiteral(query)))
+	}
+	if tag != "" {
+		filters = append(filters, fmt.Sprintf("labels = %s", jqlStringLiteral(tag)))
+	}
+	if version != "" {
+		filters = append(filters, "fixVersion IS NOT EMPTY")
+	}
 
-	issues, err := s.client.SearchIssues(ctx, jql, []string{"summary", "status", "priority", "issuetype"}, 20)
+	jql := fmt.Sprintf("%s ORDER BY updated DESC", strings.Join(filters, " AND "))
+	fields := []string{"summary", "status", "priority", "issuetype"}
+	limit := searchIssuesLimit
+	if version != "" {
+		fields = append(fields, "fixVersions")
+		limit = 0
+	}
+
+	issues, err := s.client.SearchIssues(ctx, jql, fields, limit)
 
 	if err != nil {
 		return nil, err
 	}
 
+	if version != "" {
+		issues = filterIssuesByFixVersion(issues, version, searchIssuesLimit)
+	}
+
 	return issues, nil
+}
+
+func filterIssuesByFixVersion(issues []models.Issue, version string, limit int) []models.Issue {
+	matches := make([]models.Issue, 0, min(len(issues), limit))
+	needle := strings.ToLower(version)
+
+	for _, issue := range issues {
+		for _, fixVersion := range issue.Fields.FixVersions {
+			if strings.Contains(strings.ToLower(fixVersion.Name), needle) {
+				matches = append(matches, issue)
+				break
+			}
+		}
+
+		if len(matches) == limit {
+			break
+		}
+	}
+
+	return matches
 }
 
 func (s *JiraService) GetBoards(ctx context.Context) ([]models.Board, error) {

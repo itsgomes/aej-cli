@@ -17,6 +17,7 @@ type fakeJiraGateway struct {
 	count             int
 	searchIssues      []models.Issue
 	searchJQL         string
+	searchFields      []string
 	searchLimit       int
 	issue             *models.Issue
 	issueKey          string
@@ -45,8 +46,9 @@ func (f *fakeJiraGateway) CountIssues(context.Context, string) (int, error) {
 	return f.count, nil
 }
 
-func (f *fakeJiraGateway) SearchIssues(_ context.Context, jql string, _ []string, limit int) ([]models.Issue, error) {
+func (f *fakeJiraGateway) SearchIssues(_ context.Context, jql string, fields []string, limit int) ([]models.Issue, error) {
 	f.searchJQL = jql
+	f.searchFields = fields
 	f.searchLimit = limit
 	return f.searchIssues, nil
 }
@@ -325,7 +327,7 @@ func TestJiraServiceSearchIssuesEscapesJQLLiteral(t *testing.T) {
 	gateway := &fakeJiraGateway{}
 	service := New(gateway)
 
-	_, err := service.SearchIssues(context.Background(), `C:\temp" OR assignee = currentUser()`)
+	_, err := service.SearchIssues(context.Background(), `C:\temp" OR assignee = currentUser()`, "", "")
 	if err != nil {
 		t.Fatalf("SearchIssues() error = %v", err)
 	}
@@ -333,6 +335,121 @@ func TestJiraServiceSearchIssuesEscapesJQLLiteral(t *testing.T) {
 	want := `text ~ "C:\\temp\" OR assignee = currentUser()" ORDER BY updated DESC`
 	if gateway.searchJQL != want {
 		t.Errorf("JQL = %q, want %q", gateway.searchJQL, want)
+	}
+}
+
+func TestJiraServiceSearchIssuesFiltersByTag(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{}
+	service := New(gateway)
+
+	_, err := service.SearchIssues(context.Background(), "deploy", "backend", "")
+	if err != nil {
+		t.Fatalf("SearchIssues() error = %v", err)
+	}
+
+	want := `text ~ "deploy" AND labels = "backend" ORDER BY updated DESC`
+	if gateway.searchJQL != want {
+		t.Errorf("JQL = %q, want %q", gateway.searchJQL, want)
+	}
+}
+
+func TestJiraServiceSearchIssuesAllowsTagOnly(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{}
+	service := New(gateway)
+
+	_, err := service.SearchIssues(context.Background(), "", "bug", "")
+	if err != nil {
+		t.Fatalf("SearchIssues() error = %v", err)
+	}
+
+	want := `labels = "bug" ORDER BY updated DESC`
+	if gateway.searchJQL != want {
+		t.Errorf("JQL = %q, want %q", gateway.searchJQL, want)
+	}
+}
+
+func TestJiraServiceSearchIssuesFiltersByPartialFixVersion(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{
+		searchIssues: []models.Issue{
+			{
+				Key: "AEJ-1",
+				Fields: models.IssueFields{
+					FixVersions: []models.IssueVersion{{Name: "Release 2.1.0"}},
+				},
+			},
+			{
+				Key: "AEJ-2",
+				Fields: models.IssueFields{
+					FixVersions: []models.IssueVersion{{Name: "Release 3.0.0"}},
+				},
+			},
+			{
+				Key: "AEJ-3",
+				Fields: models.IssueFields{
+					FixVersions: []models.IssueVersion{{Name: "Hotfix 2.1.1"}},
+				},
+			},
+		},
+	}
+	service := New(gateway)
+
+	issues, err := service.SearchIssues(context.Background(), "deploy", "backend", "2.1")
+	if err != nil {
+		t.Fatalf("SearchIssues() error = %v", err)
+	}
+
+	wantJQL := `text ~ "deploy" AND labels = "backend" AND fixVersion IS NOT EMPTY ORDER BY updated DESC`
+	if gateway.searchJQL != wantJQL {
+		t.Errorf("JQL = %q, want %q", gateway.searchJQL, wantJQL)
+	}
+
+	wantFields := []string{"summary", "status", "priority", "issuetype", "fixVersions"}
+	if !slices.Equal(gateway.searchFields, wantFields) {
+		t.Errorf("fields = %v, want %v", gateway.searchFields, wantFields)
+	}
+
+	if gateway.searchLimit != 0 {
+		t.Errorf("limit = %d, want 0 to allow client-side version filtering", gateway.searchLimit)
+	}
+
+	if len(issues) != 2 || issues[0].Key != "AEJ-1" || issues[1].Key != "AEJ-3" {
+		t.Errorf("issues = %#v, want AEJ-1 and AEJ-3", issues)
+	}
+}
+
+func TestJiraServiceSearchIssuesAllowsVersionOnly(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{
+		searchIssues: []models.Issue{
+			{
+				Key: "AEJ-1",
+				Fields: models.IssueFields{
+					FixVersions: []models.IssueVersion{{Name: "Release 2.1.0"}},
+				},
+			},
+		},
+	}
+	service := New(gateway)
+
+	issues, err := service.SearchIssues(context.Background(), "", "", "release")
+	if err != nil {
+		t.Fatalf("SearchIssues() error = %v", err)
+	}
+
+	wantJQL := `fixVersion IS NOT EMPTY ORDER BY updated DESC`
+	if gateway.searchJQL != wantJQL {
+		t.Errorf("JQL = %q, want %q", gateway.searchJQL, wantJQL)
+	}
+
+	if len(issues) != 1 || issues[0].Key != "AEJ-1" {
+		t.Errorf("issues = %#v, want AEJ-1", issues)
 	}
 }
 

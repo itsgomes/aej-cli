@@ -27,6 +27,9 @@ type fakeService struct {
 	weekly            []models.IssueWorklogSummary
 	weeklyTotal       int
 	myIssuesStatus    string
+	searchQuery       string
+	searchTag         string
+	searchVersion     string
 }
 
 var _ Service = (*fakeService)(nil)
@@ -45,7 +48,10 @@ func (f *fakeService) GetIssue(context.Context, string) (*models.Issue, error) {
 	return f.issue, f.issueErr
 }
 
-func (f *fakeService) SearchIssues(context.Context, string) ([]models.Issue, error) {
+func (f *fakeService) SearchIssues(_ context.Context, query string, tag string, version string) ([]models.Issue, error) {
+	f.searchQuery = query
+	f.searchTag = tag
+	f.searchVersion = version
 	return f.search, nil
 }
 
@@ -134,6 +140,66 @@ func TestMineCommandRendersStatusEmptyMessage(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Nenhuma issue atribuída a você encontrada para o status informado.") {
 		t.Errorf("stdout = %q, want status empty message", stdout)
+	}
+}
+
+func TestSearchCommandPassesTagFilter(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{}
+
+	_, _, err := executeForTest(t, testDependencies(service), []string{"search", "deploy", "--tag", "backend"}, "")
+	if err != nil {
+		t.Fatalf("search error = %v", err)
+	}
+
+	if service.searchQuery != "deploy" {
+		t.Errorf("query = %q, want deploy", service.searchQuery)
+	}
+	if service.searchTag != "backend" {
+		t.Errorf("tag = %q, want backend", service.searchTag)
+	}
+}
+
+func TestSearchCommandAllowsTagOnly(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{}
+
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"search", "--tag", "bug"}, "")
+	if err != nil {
+		t.Fatalf("search error = %v", err)
+	}
+
+	if service.searchQuery != "" {
+		t.Errorf("query = %q, want empty", service.searchQuery)
+	}
+	if service.searchTag != "bug" {
+		t.Errorf("tag = %q, want bug", service.searchTag)
+	}
+	if !strings.Contains(stdout, `Resultados para tag "bug"`) {
+		t.Errorf("stdout = %q, want tag title", stdout)
+	}
+}
+
+func TestSearchCommandPassesVersionFilter(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{}
+
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"search", "--version", "2.1"}, "")
+	if err != nil {
+		t.Fatalf("search error = %v", err)
+	}
+
+	if service.searchQuery != "" {
+		t.Errorf("query = %q, want empty", service.searchQuery)
+	}
+	if service.searchVersion != "2.1" {
+		t.Errorf("version = %q, want 2.1", service.searchVersion)
+	}
+	if !strings.Contains(stdout, `Resultados para versão "2.1"`) {
+		t.Errorf("stdout = %q, want version title", stdout)
 	}
 }
 

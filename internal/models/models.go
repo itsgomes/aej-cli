@@ -13,15 +13,16 @@ type Issue struct {
 }
 
 type IssueFields struct {
-	Summary     string       `json:"summary"`
-	Description *ADFDocument `json:"description"`
-	Status      Status       `json:"status"`
-	Assignee    *User        `json:"assignee"`
-	Priority    *Priority    `json:"priority"`
-	Labels      []string     `json:"labels"`
-	IssueType   IssueType    `json:"issuetype"`
-	Created     string       `json:"created"`
-	Updated     string       `json:"updated"`
+	Summary     string         `json:"summary"`
+	Description *ADFDocument   `json:"description"`
+	Status      Status         `json:"status"`
+	Assignee    *User          `json:"assignee"`
+	Priority    *Priority      `json:"priority"`
+	Labels      []string       `json:"labels"`
+	FixVersions []IssueVersion `json:"fixVersions"`
+	IssueType   IssueType      `json:"issuetype"`
+	Created     string         `json:"created"`
+	Updated     string         `json:"updated"`
 }
 
 type Status struct {
@@ -39,6 +40,10 @@ type Priority struct {
 }
 
 type IssueType struct {
+	Name string `json:"name"`
+}
+
+type IssueVersion struct {
 	Name string `json:"name"`
 }
 
