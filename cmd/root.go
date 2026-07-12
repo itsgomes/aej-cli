@@ -35,6 +35,7 @@ func NewRootCommand(deps Dependencies) *cobra.Command {
 		newMineCommand(deps),
 		newSearchCommand(deps),
 		newIssueCommand(deps),
+		newTransitionCommand(deps),
 		newLogCommand(deps),
 		newLogsCommand(deps),
 	}

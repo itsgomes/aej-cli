@@ -245,6 +245,40 @@ func (c *Client) GetIssue(ctx context.Context, key string) (*models.Issue, error
 	return &issue, handleResponse(resp)
 }
 
+func (c *Client) GetIssueTransitions(ctx context.Context, issueKey string) ([]models.Transition, error) {
+	var result models.TransitionsResult
+
+	resp, err := c.http.R().
+		SetContext(ctx).
+		SetResult(&result).
+		Get("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
+
+	if err != nil {
+		return nil, fmt.Errorf("erro de rede: %w", err)
+	}
+
+	if err := handleResponse(resp); err != nil {
+		return nil, err
+	}
+
+	return result.Transitions, nil
+}
+
+func (c *Client) TransitionIssue(ctx context.Context, issueKey, transitionID string) error {
+	resp, err := c.writeHTTP.R().
+		SetContext(ctx).
+		SetBody(map[string]any{
+			"transition": map[string]string{"id": transitionID},
+		}).
+		Post("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
+
+	if err != nil {
+		return fmt.Errorf("erro de rede: %w", err)
+	}
+
+	return handleResponse(resp)
+}
+
 func (c *Client) GetBoards(ctx context.Context) ([]models.Board, error) {
 	boards := make([]models.Board, 0, defaultPageSize)
 	startAt := 0

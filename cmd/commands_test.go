@@ -30,6 +30,9 @@ type fakeService struct {
 	searchQuery       string
 	searchTag         string
 	searchVersion     string
+	transitions       []models.Transition
+	transitionIssue   string
+	transitionID      string
 }
 
 var _ Service = (*fakeService)(nil)
@@ -46,6 +49,17 @@ func (f *fakeService) GetMyIssues(_ context.Context, status string) ([]models.Is
 
 func (f *fakeService) GetIssue(context.Context, string) (*models.Issue, error) {
 	return f.issue, f.issueErr
+}
+
+func (f *fakeService) GetIssueTransitions(_ context.Context, issueKey string) ([]models.Transition, error) {
+	f.transitionIssue = issueKey
+	return f.transitions, nil
+}
+
+func (f *fakeService) TransitionIssue(_ context.Context, issueKey, transitionID string) error {
+	f.transitionIssue = issueKey
+	f.transitionID = transitionID
+	return nil
 }
 
 func (f *fakeService) SearchIssues(_ context.Context, query string, tag string, version string) ([]models.Issue, error) {
@@ -214,6 +228,55 @@ func TestIssueCommandClassifiesInjectedNotFoundError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "AEJ-404") {
 		t.Errorf("issue error = %q, want normalized issue key", err.Error())
+	}
+}
+
+func TestTransitionCommandListsOptionsAndExecutesSelection(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{transitions: []models.Transition{
+		{ID: "21", Name: "Iniciar trabalho", To: models.Status{Name: "Em andamento"}},
+		{ID: "31", Name: "Concluir", To: models.Status{Name: "Concluído"}},
+	}}
+
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"transition", "aej-42"}, "2\n")
+	if err != nil {
+		t.Fatalf("transition error = %v", err)
+	}
+	if service.transitionIssue != "AEJ-42" || service.transitionID != "31" {
+		t.Errorf("transition = (%q, %q), want (AEJ-42, 31)", service.transitionIssue, service.transitionID)
+	}
+	if !strings.Contains(stdout, "Em andamento") || !strings.Contains(stdout, "Concluído") || !strings.Contains(stdout, "alterada para") {
+		t.Errorf("stdout = %q, want options and success message", stdout)
+	}
+}
+
+func TestTransitionCommandRejectsInvalidSelection(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{transitions: []models.Transition{
+		{ID: "21", Name: "Iniciar trabalho", To: models.Status{Name: "Em andamento"}},
+	}}
+
+	_, _, err := executeForTest(t, testDependencies(service), []string{"transition", "AEJ-42"}, "2\n")
+	if err == nil || !strings.Contains(err.Error(), "opção inválida") {
+		t.Fatalf("transition error = %v, want invalid option", err)
+	}
+	if service.transitionID != "" {
+		t.Errorf("transition ID = %q, want no transition", service.transitionID)
+	}
+}
+
+func TestTransitionCommandHandlesNoAvailableTransitions(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{}
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"transition", "AEJ-42"}, "")
+	if err != nil {
+		t.Fatalf("transition error = %v", err)
+	}
+	if !strings.Contains(stdout, "Nenhuma transição disponível") {
+		t.Errorf("stdout = %q, want empty transitions message", stdout)
 	}
 }
 

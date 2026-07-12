@@ -14,6 +14,8 @@ type Service interface {
 	GetCurrentUserWithStats(context.Context) (*models.User, int, error)
 	GetMyIssues(context.Context, string) ([]models.Issue, error)
 	GetIssue(context.Context, string) (*models.Issue, error)
+	GetIssueTransitions(context.Context, string) ([]models.Transition, error)
+	TransitionIssue(context.Context, string, string) error
 	SearchIssues(context.Context, string, string, string) ([]models.Issue, error)
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int) ([]models.Issue, error)

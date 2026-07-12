@@ -34,6 +34,9 @@ type fakeJiraGateway struct {
 	worklogTime       string
 	worklogComment    string
 	worklogStarted    string
+	transitions       []models.Transition
+	transitionIssue   string
+	transitionID      string
 }
 
 var _ JiraGateway = (*fakeJiraGateway)(nil)
@@ -56,6 +59,17 @@ func (f *fakeJiraGateway) SearchIssues(_ context.Context, jql string, fields []s
 func (f *fakeJiraGateway) GetIssue(_ context.Context, issueKey string) (*models.Issue, error) {
 	f.issueKey = issueKey
 	return f.issue, nil
+}
+
+func (f *fakeJiraGateway) GetIssueTransitions(_ context.Context, issueKey string) ([]models.Transition, error) {
+	f.transitionIssue = issueKey
+	return f.transitions, nil
+}
+
+func (f *fakeJiraGateway) TransitionIssue(_ context.Context, issueKey, transitionID string) error {
+	f.transitionIssue = issueKey
+	f.transitionID = transitionID
+	return nil
 }
 
 func (f *fakeJiraGateway) GetBoards(context.Context) ([]models.Board, error) {

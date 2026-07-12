@@ -79,6 +79,56 @@ func TestClientEscapesIssueKeyPathSegment(t *testing.T) {
 	}
 }
 
+func TestClientGetsIssueTransitions(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/rest/api/3/issue/AEJ-42/transitions" {
+			t.Errorf("request = %s %s, want GET transitions endpoint", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"transitions":[{"id":"21","name":"Iniciar trabalho","to":{"id":"3","name":"Em andamento"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := New(&config.Config{JiraURL: server.URL})
+	transitions, err := client.GetIssueTransitions(context.Background(), "AEJ-42")
+	if err != nil {
+		t.Fatalf("GetIssueTransitions() error = %v", err)
+	}
+	if len(transitions) != 1 || transitions[0].ID != "21" || transitions[0].To.Name != "Em andamento" {
+		t.Errorf("transitions = %#v, want decoded transition", transitions)
+	}
+}
+
+func TestClientTransitionsIssue(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/rest/api/3/issue/AEJ-42/transitions" {
+			t.Errorf("request = %s %s, want POST transitions endpoint", r.Method, r.URL.Path)
+		}
+		var body struct {
+			Transition struct {
+				ID string `json:"id"`
+			} `json:"transition"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body.Transition.ID != "31" {
+			t.Errorf("transition ID = %q, want 31", body.Transition.ID)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+
+	client := New(&config.Config{JiraURL: server.URL})
+	if err := client.TransitionIssue(context.Background(), "AEJ-42", "31"); err != nil {
+		t.Fatalf("TransitionIssue() error = %v", err)
+	}
+}
+
 func TestClientHonorsCanceledContext(t *testing.T) {
 	t.Parallel()
 

@@ -20,6 +20,8 @@ type JiraGateway interface {
 	CountIssues(context.Context, string) (int, error)
 	SearchIssues(context.Context, string, []string, int) ([]models.Issue, error)
 	GetIssue(context.Context, string) (*models.Issue, error)
+	GetIssueTransitions(context.Context, string) ([]models.Transition, error)
+	TransitionIssue(context.Context, string, string) error
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int, string, []string, int) ([]models.Issue, error)
 	AddWorklog(context.Context, string, string, string, string) error
@@ -112,6 +114,29 @@ func (s *JiraService) GetIssue(ctx context.Context, key string) (*models.Issue, 
 	}
 
 	return s.client.GetIssue(ctx, normalizedKey)
+}
+
+func (s *JiraService) GetIssueTransitions(ctx context.Context, key string) ([]models.Transition, error) {
+	normalizedKey, err := normalizeIssueKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.GetIssueTransitions(ctx, normalizedKey)
+}
+
+func (s *JiraService) TransitionIssue(ctx context.Context, key, transitionID string) error {
+	normalizedKey, err := normalizeIssueKey(key)
+	if err != nil {
+		return err
+	}
+
+	transitionID = strings.TrimSpace(transitionID)
+	if transitionID == "" {
+		return errors.New("o ID da transição é obrigatório")
+	}
+
+	return s.client.TransitionIssue(ctx, normalizedKey, transitionID)
 }
 
 func (s *JiraService) SearchIssues(ctx context.Context, query string, tag string, version string) ([]models.Issue, error) {

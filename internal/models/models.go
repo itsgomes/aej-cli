@@ -26,8 +26,19 @@ type IssueFields struct {
 }
 
 type Status struct {
+	ID             string         `json:"id"`
 	Name           string         `json:"name"`
 	StatusCategory StatusCategory `json:"statusCategory"`
+}
+
+type Transition struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	To   Status `json:"to"`
+}
+
+type TransitionsResult struct {
+	Transitions []Transition `json:"transitions"`
 }
 
 type StatusCategory struct {
