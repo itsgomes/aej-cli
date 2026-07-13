@@ -129,6 +129,32 @@ func TestClientTransitionsIssue(t *testing.T) {
 	}
 }
 
+func TestClientAssignsIssue(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut || r.URL.Path != "/rest/api/3/issue/AEJ-42/assignee" {
+			t.Errorf("request = %s %s, want PUT assignee endpoint", r.Method, r.URL.Path)
+		}
+		var body struct {
+			AccountID string `json:"accountId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body.AccountID != "account-1" {
+			t.Errorf("accountId = %q, want account-1", body.AccountID)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+
+	client := New(&config.Config{JiraURL: server.URL})
+	if err := client.AssignIssue(context.Background(), "AEJ-42", "account-1"); err != nil {
+		t.Fatalf("AssignIssue() error = %v", err)
+	}
+}
+
 func TestClientHonorsCanceledContext(t *testing.T) {
 	t.Parallel()
 

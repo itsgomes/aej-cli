@@ -279,6 +279,19 @@ func (c *Client) TransitionIssue(ctx context.Context, issueKey, transitionID str
 	return handleResponse(resp)
 }
 
+func (c *Client) AssignIssue(ctx context.Context, issueKey, accountID string) error {
+	resp, err := c.writeHTTP.R().
+		SetContext(ctx).
+		SetBody(map[string]string{"accountId": accountID}).
+		Put("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/assignee")
+
+	if err != nil {
+		return fmt.Errorf("erro de rede: %w", err)
+	}
+
+	return handleResponse(resp)
+}
+
 func (c *Client) GetBoards(ctx context.Context) ([]models.Board, error) {
 	boards := make([]models.Board, 0, defaultPageSize)
 	startAt := 0

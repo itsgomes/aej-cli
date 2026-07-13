@@ -16,6 +16,7 @@ type Service interface {
 	GetIssue(context.Context, string) (*models.Issue, error)
 	GetIssueTransitions(context.Context, string) ([]models.Transition, error)
 	TransitionIssue(context.Context, string, string) error
+	AssignIssueToMe(context.Context, string) (*models.User, error)
 	SearchIssues(context.Context, string, string, string) ([]models.Issue, error)
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int) ([]models.Issue, error)

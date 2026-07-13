@@ -33,6 +33,8 @@ type fakeService struct {
 	transitions       []models.Transition
 	transitionIssue   string
 	transitionID      string
+	assignIssue       string
+	assignUser        *models.User
 }
 
 var _ Service = (*fakeService)(nil)
@@ -60,6 +62,11 @@ func (f *fakeService) TransitionIssue(_ context.Context, issueKey, transitionID 
 	f.transitionIssue = issueKey
 	f.transitionID = transitionID
 	return nil
+}
+
+func (f *fakeService) AssignIssueToMe(_ context.Context, issueKey string) (*models.User, error) {
+	f.assignIssue = issueKey
+	return f.assignUser, nil
 }
 
 func (f *fakeService) SearchIssues(_ context.Context, query string, tag string, version string) ([]models.Issue, error) {
@@ -277,6 +284,23 @@ func TestTransitionCommandHandlesNoAvailableTransitions(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Nenhuma transição disponível") {
 		t.Errorf("stdout = %q, want empty transitions message", stdout)
+	}
+}
+
+func TestAssignCommandAssignsIssueToCurrentUser(t *testing.T) {
+	t.Parallel()
+
+	service := &fakeService{assignUser: &models.User{DisplayName: "Ada Lovelace"}}
+
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"assign", "aej-42"}, "")
+	if err != nil {
+		t.Fatalf("assign error = %v", err)
+	}
+	if service.assignIssue != "AEJ-42" {
+		t.Errorf("issue key = %q, want AEJ-42", service.assignIssue)
+	}
+	if !strings.Contains(stdout, "AEJ-42") || !strings.Contains(stdout, "Ada Lovelace") || !strings.Contains(stdout, "atribuída") {
+		t.Errorf("stdout = %q, want issue, user and success message", stdout)
 	}
 }
 

@@ -20,7 +20,7 @@ func TestNewRootCommandBuildsIndependentTrees(t *testing.T) {
 		t.Fatal("NewRootCommand() returned shared command instance")
 	}
 
-	wantCommands := []string{"board", "issue", "log", "login", "logs", "me", "mine", "search", "transition"}
+	wantCommands := []string{"assign", "board", "issue", "log", "login", "logs", "me", "mine", "search", "transition"}
 	for _, root := range []*cobra.Command{first, second} {
 		gotCommands := root.Commands()
 		if len(gotCommands) != len(wantCommands) {

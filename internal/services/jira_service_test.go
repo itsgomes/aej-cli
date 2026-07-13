@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,6 +38,8 @@ type fakeJiraGateway struct {
 	transitions       []models.Transition
 	transitionIssue   string
 	transitionID      string
+	assignIssue       string
+	assignAccountID   string
 }
 
 var _ JiraGateway = (*fakeJiraGateway)(nil)
@@ -69,6 +72,12 @@ func (f *fakeJiraGateway) GetIssueTransitions(_ context.Context, issueKey string
 func (f *fakeJiraGateway) TransitionIssue(_ context.Context, issueKey, transitionID string) error {
 	f.transitionIssue = issueKey
 	f.transitionID = transitionID
+	return nil
+}
+
+func (f *fakeJiraGateway) AssignIssue(_ context.Context, issueKey, accountID string) error {
+	f.assignIssue = issueKey
+	f.assignAccountID = accountID
 	return nil
 }
 
@@ -140,6 +149,55 @@ func TestJiraServiceGetBoardIssuesAppliesFilterAndLimit(t *testing.T) {
 
 	if gateway.boardIssuesLimit != 50 {
 		t.Errorf("limit = %d, want 50", gateway.boardIssuesLimit)
+	}
+}
+
+func TestJiraServiceAssignIssueToMeUsesCurrentUserAccountID(t *testing.T) {
+	t.Parallel()
+
+	wantUser := &models.User{AccountID: "account-1", DisplayName: "Ada Lovelace"}
+	gateway := &fakeJiraGateway{currentUser: wantUser}
+	service := New(gateway)
+
+	user, err := service.AssignIssueToMe(context.Background(), " aej-42 ")
+	if err != nil {
+		t.Fatalf("AssignIssueToMe() error = %v", err)
+	}
+	if user != wantUser {
+		t.Errorf("user = %#v, want current user", user)
+	}
+	if gateway.assignIssue != "AEJ-42" || gateway.assignAccountID != "account-1" {
+		t.Errorf("assignment = (%q, %q), want (AEJ-42, account-1)", gateway.assignIssue, gateway.assignAccountID)
+	}
+}
+
+func TestJiraServiceAssignIssueToMeRejectsInvalidIssueKey(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{currentUser: &models.User{AccountID: "account-1"}}
+	service := New(gateway)
+
+	_, err := service.AssignIssueToMe(context.Background(), "AEJ-1/../../myself")
+	if !errors.Is(err, ErrInvalidIssueKey) {
+		t.Fatalf("AssignIssueToMe() error = %v, want ErrInvalidIssueKey", err)
+	}
+	if gateway.assignIssue != "" {
+		t.Errorf("gateway received invalid key %q", gateway.assignIssue)
+	}
+}
+
+func TestJiraServiceAssignIssueToMeRequiresCurrentUserAccountID(t *testing.T) {
+	t.Parallel()
+
+	gateway := &fakeJiraGateway{currentUser: &models.User{DisplayName: "Ada Lovelace"}}
+	service := New(gateway)
+
+	_, err := service.AssignIssueToMe(context.Background(), "AEJ-42")
+	if err == nil || !strings.Contains(err.Error(), "accountId") {
+		t.Fatalf("AssignIssueToMe() error = %v, want missing accountId error", err)
+	}
+	if gateway.assignIssue != "" {
+		t.Errorf("AssignIssue() called with issue %q without an accountId", gateway.assignIssue)
 	}
 }
 

@@ -22,6 +22,7 @@ type JiraGateway interface {
 	GetIssue(context.Context, string) (*models.Issue, error)
 	GetIssueTransitions(context.Context, string) ([]models.Transition, error)
 	TransitionIssue(context.Context, string, string) error
+	AssignIssue(context.Context, string, string) error
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int, string, []string, int) ([]models.Issue, error)
 	AddWorklog(context.Context, string, string, string, string) error
@@ -137,6 +138,27 @@ func (s *JiraService) TransitionIssue(ctx context.Context, key, transitionID str
 	}
 
 	return s.client.TransitionIssue(ctx, normalizedKey, transitionID)
+}
+
+func (s *JiraService) AssignIssueToMe(ctx context.Context, key string) (*models.User, error) {
+	normalizedKey, err := normalizeIssueKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.client.GetCurrentUser(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("obter usuário atual: %w", err)
+	}
+	if user == nil || strings.TrimSpace(user.AccountID) == "" {
+		return nil, errors.New("usuário atual sem accountId no Jira")
+	}
+
+	if err := s.client.AssignIssue(ctx, normalizedKey, user.AccountID); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (s *JiraService) SearchIssues(ctx context.Context, query string, tag string, version string) ([]models.Issue, error) {
