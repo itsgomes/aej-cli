@@ -34,6 +34,7 @@ type Dependencies struct {
 	SaveConfig       func(config.Config) error
 	NewService       func(*config.Config) Service
 	NewAuthenticator func(*config.Config) Authenticator
+	OpenURL          func(string) error
 }
 
 func defaultDependencies() Dependencies {
@@ -46,5 +47,6 @@ func defaultDependencies() Dependencies {
 		NewAuthenticator: func(cfg *config.Config) Authenticator {
 			return jiraclient.New(cfg)
 		},
+		OpenURL: openURL,
 	}
 }

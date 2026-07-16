@@ -66,8 +66,9 @@ func (f *fakeService) TransitionIssue(_ context.Context, issueKey, transitionID 
 	return nil
 }
 
-func (f *fakeService) AssignIssueToMe(_ context.Context, issueKey string) (*models.User, error) {
+func (f *fakeService) AssignIssue(_ context.Context, issueKey, target string) (*models.User, error) {
 	f.assignIssue = issueKey
+	f.assignTarget = target
 	return f.assignUser, nil
 }
 
@@ -327,6 +328,17 @@ func TestCommentCommandJoinsTextAndNormalizesKey(t *testing.T) {
 	}
 }
 
+func TestOpenCommandBuildsJiraBrowseURL(t *testing.T) {
+	t.Parallel()
+	deps := testDependencies(&fakeService{})
+	var opened string
+	deps.OpenURL = func(target string) error { opened = target; return nil }
+	_, _, err := executeForTest(t, deps, []string{"open", "aej-42"}, "")
+	if err != nil || opened != "https://example.atlassian.net/browse/AEJ-42" {
+		t.Fatalf("open = (%v, %q)", err, opened)
+	}
+}
+
 func TestLoginCommandUsesInjectedAuthenticatorAndStore(t *testing.T) {
 	t.Parallel()
 
@@ -475,6 +487,7 @@ func testDependencies(service Service) Dependencies {
 				return &models.User{}, nil
 			})
 		},
+		OpenURL: func(string) error { return nil },
 	}
 }
 
