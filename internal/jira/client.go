@@ -280,9 +280,13 @@ func (c *Client) TransitionIssue(ctx context.Context, issueKey, transitionID str
 }
 
 func (c *Client) AssignIssue(ctx context.Context, issueKey, accountID string) error {
+	var value any = accountID
+	if accountID == "" {
+		value = nil
+	}
 	resp, err := c.writeHTTP.R().
 		SetContext(ctx).
-		SetBody(map[string]string{"accountId": accountID}).
+		SetBody(map[string]any{"accountId": value}).
 		Put("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/assignee")
 
 	if err != nil {
@@ -290,6 +294,22 @@ func (c *Client) AssignIssue(ctx context.Context, issueKey, accountID string) er
 	}
 
 	return handleResponse(resp)
+}
+
+func (c *Client) FindAssignableUsers(ctx context.Context, issueKey, query string) ([]models.User, error) {
+	var users []models.User
+	resp, err := c.http.R().
+		SetContext(ctx).
+		SetQueryParams(map[string]string{"issueKey": issueKey, "query": query, "maxResults": "50"}).
+		SetResult(&users).
+		Get("/rest/api/3/user/assignable/search")
+	if err != nil {
+		return nil, fmt.Errorf("erro de rede: %w", err)
+	}
+	if err := handleResponse(resp); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (c *Client) AddComment(ctx context.Context, issueKey, comment string) error {

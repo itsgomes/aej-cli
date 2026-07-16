@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/itsgomes/aej-cli/internal/config"
+	"github.com/itsgomes/aej-cli/internal/models"
 )
 
 func TestClientGetCurrentUser(t *testing.T) {
@@ -155,6 +156,24 @@ func TestClientAssignsIssue(t *testing.T) {
 	}
 }
 
+func TestClientUnassignsIssueWithNullAccountID(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if value, exists := body["accountId"]; !exists || value != nil {
+			t.Errorf("accountId = %#v (exists %v), want explicit null", value, exists)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+	if err := New(&config.Config{JiraURL: server.URL}).AssignIssue(context.Background(), "AEJ-42", ""); err != nil {
+		t.Fatalf("AssignIssue() error = %v", err)
+	}
+}
+
 func TestClientAddsADFComment(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +194,22 @@ func TestClientAddsADFComment(t *testing.T) {
 	t.Cleanup(server.Close)
 	if err := New(&config.Config{JiraURL: server.URL}).AddComment(context.Background(), "AEJ-42", "Pronto"); err != nil {
 		t.Fatalf("AddComment() error = %v", err)
+	}
+}
+
+func TestClientFindsAssignableUsers(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/api/3/user/assignable/search" || r.URL.Query().Get("issueKey") != "AEJ-42" || r.URL.Query().Get("query") != "Ada" {
+			t.Errorf("request URL = %s", r.URL.String())
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"accountId":"account-1","displayName":"Ada"}]`))
+	}))
+	t.Cleanup(server.Close)
+	users, err := New(&config.Config{JiraURL: server.URL}).FindAssignableUsers(context.Background(), "AEJ-42", "Ada")
+	if err != nil || len(users) != 1 || users[0].AccountID != "account-1" {
+		t.Fatalf("FindAssignableUsers() = (%#v, %v)", users, err)
 	}
 }
 

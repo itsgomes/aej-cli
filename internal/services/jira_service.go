@@ -23,6 +23,7 @@ type JiraGateway interface {
 	GetIssueTransitions(context.Context, string) ([]models.Transition, error)
 	TransitionIssue(context.Context, string, string) error
 	AssignIssue(context.Context, string, string) error
+	FindAssignableUsers(context.Context, string, string) ([]models.User, error)
 	AddComment(context.Context, string, string) error
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int, string, []string, int) ([]models.Issue, error)
@@ -141,25 +142,78 @@ func (s *JiraService) TransitionIssue(ctx context.Context, key, transitionID str
 	return s.client.TransitionIssue(ctx, normalizedKey, transitionID)
 }
 
-func (s *JiraService) AssignIssueToMe(ctx context.Context, key string) (*models.User, error) {
+func (s *JiraService) AssignIssue(ctx context.Context, key, assignee string) (*models.User, error) {
 	normalizedKey, err := normalizeIssueKey(key)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := s.client.GetCurrentUser(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("obter usuário atual: %w", err)
-	}
-	if user == nil || strings.TrimSpace(user.AccountID) == "" {
-		return nil, errors.New("usuário atual sem accountId no Jira")
+	assignee = strings.TrimSpace(assignee)
+	var user *models.User
+	var accountID string
+
+	switch assignee {
+	case "me":
+		user, err = s.client.GetCurrentUser(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("obter usuário atual: %w", err)
+		}
+		if user == nil || strings.TrimSpace(user.AccountID) == "" {
+			return nil, errors.New("usuário atual sem accountId no Jira")
+		}
+		accountID = user.AccountID
+	case "unassigned":
+		accountID = ""
+	case "default":
+		accountID = "-1"
+	default:
+		if assignee == "" {
+			return nil, errors.New("o responsável é obrigatório")
+		}
+		users, findErr := s.client.FindAssignableUsers(ctx, normalizedKey, assignee)
+		if findErr != nil {
+			return nil, findErr
+		}
+		user, err = selectAssignableUser(users, assignee)
+		if err != nil {
+			return nil, err
+		}
+		accountID = user.AccountID
 	}
 
-	if err := s.client.AssignIssue(ctx, normalizedKey, user.AccountID); err != nil {
+	if err := s.client.AssignIssue(ctx, normalizedKey, accountID); err != nil {
 		return nil, err
 	}
 
 	return user, nil
+}
+
+func (s *JiraService) AssignIssueToMe(ctx context.Context, key string) (*models.User, error) {
+	return s.AssignIssue(ctx, key, "me")
+}
+
+func selectAssignableUser(users []models.User, query string) (*models.User, error) {
+	query = strings.TrimSpace(query)
+	var exactMatches []*models.User
+	for index := range users {
+		user := &users[index]
+		if strings.EqualFold(user.AccountID, query) || strings.EqualFold(user.EmailAddress, query) || strings.EqualFold(user.DisplayName, query) {
+			exactMatches = append(exactMatches, user)
+		}
+	}
+	if len(exactMatches) == 1 {
+		return exactMatches[0], nil
+	}
+	if len(exactMatches) > 1 {
+		return nil, fmt.Errorf("mais de um usuário atribuível encontrado para %q; informe o e-mail ou accountId", query)
+	}
+	if len(users) == 1 {
+		return &users[0], nil
+	}
+	if len(users) == 0 {
+		return nil, fmt.Errorf("nenhum usuário atribuível encontrado para %q", query)
+	}
+	return nil, fmt.Errorf("mais de um usuário atribuível encontrado para %q; informe o e-mail ou accountId", query)
 }
 
 func (s *JiraService) AddComment(ctx context.Context, key, comment string) error {

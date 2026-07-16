@@ -34,6 +34,7 @@ type fakeService struct {
 	transitionIssue   string
 	transitionID      string
 	assignIssue       string
+	assignTarget      string
 	assignUser        *models.User
 	commentIssue      string
 	commentText       string
@@ -308,8 +309,25 @@ func TestAssignCommandAssignsIssueToCurrentUser(t *testing.T) {
 	if service.assignIssue != "AEJ-42" {
 		t.Errorf("issue key = %q, want AEJ-42", service.assignIssue)
 	}
+	if service.assignTarget != "me" {
+		t.Errorf("target = %q, want me", service.assignTarget)
+	}
 	if !strings.Contains(stdout, "AEJ-42") || !strings.Contains(stdout, "Ada Lovelace") || !strings.Contains(stdout, "atribuída") {
 		t.Errorf("stdout = %q, want issue, user and success message", stdout)
+	}
+}
+
+func TestAssignCommandSupportsExplicitUserAndUnassign(t *testing.T) {
+	t.Parallel()
+	userService := &fakeService{assignUser: &models.User{DisplayName: "Grace Hopper"}}
+	_, _, err := executeForTest(t, testDependencies(userService), []string{"assign", "AEJ-42", "--to", "grace@example.com"}, "")
+	if err != nil || userService.assignTarget != "grace@example.com" {
+		t.Fatalf("assign --to error/target = (%v, %q)", err, userService.assignTarget)
+	}
+	unassignService := &fakeService{}
+	stdout, _, err := executeForTest(t, testDependencies(unassignService), []string{"assign", "AEJ-42", "--unassign"}, "")
+	if err != nil || unassignService.assignTarget != "unassigned" || !strings.Contains(stdout, "removido") {
+		t.Fatalf("assign --unassign = (%v, %q, %q)", err, unassignService.assignTarget, stdout)
 	}
 }
 

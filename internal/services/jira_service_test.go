@@ -40,6 +40,9 @@ type fakeJiraGateway struct {
 	transitionID      string
 	assignIssue       string
 	assignAccountID   string
+	assignableUsers   []models.User
+	assignableIssue   string
+	assignableQuery   string
 	commentIssue      string
 	commentText       string
 }
@@ -81,6 +84,12 @@ func (f *fakeJiraGateway) AssignIssue(_ context.Context, issueKey, accountID str
 	f.assignIssue = issueKey
 	f.assignAccountID = accountID
 	return nil
+}
+
+func (f *fakeJiraGateway) FindAssignableUsers(_ context.Context, issueKey, query string) ([]models.User, error) {
+	f.assignableIssue = issueKey
+	f.assignableQuery = query
+	return f.assignableUsers, nil
 }
 
 func (f *fakeJiraGateway) AddComment(_ context.Context, issueKey, comment string) error {
@@ -206,6 +215,29 @@ func TestJiraServiceAssignIssueToMeRequiresCurrentUserAccountID(t *testing.T) {
 	}
 	if gateway.assignIssue != "" {
 		t.Errorf("AssignIssue() called with issue %q without an accountId", gateway.assignIssue)
+	}
+}
+
+func TestJiraServiceAssignIssueFindsExplicitUser(t *testing.T) {
+	t.Parallel()
+	gateway := &fakeJiraGateway{assignableUsers: []models.User{{AccountID: "account-2", EmailAddress: "grace@example.com"}}}
+	user, err := New(gateway).AssignIssue(context.Background(), "aej-42", "grace@example.com")
+	if err != nil {
+		t.Fatalf("AssignIssue() error = %v", err)
+	}
+	if user.AccountID != "account-2" || gateway.assignAccountID != "account-2" || gateway.assignableIssue != "AEJ-42" {
+		t.Errorf("assignment user/gateway = (%#v, %q, %q)", user, gateway.assignAccountID, gateway.assignableIssue)
+	}
+}
+
+func TestJiraServiceAssignIssueSupportsUnassignedAndDefault(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct{ target, accountID string }{{"unassigned", ""}, {"default", "-1"}} {
+		gateway := &fakeJiraGateway{}
+		user, err := New(gateway).AssignIssue(context.Background(), "AEJ-42", test.target)
+		if err != nil || user != nil || gateway.assignAccountID != test.accountID {
+			t.Errorf("AssignIssue(%q) = (%#v, %v, %q)", test.target, user, err, gateway.assignAccountID)
+		}
 	}
 }
 
