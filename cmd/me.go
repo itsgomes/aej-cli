@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/itsgomes/aej-cli/internal/cli"
+	"github.com/itsgomes/aej-cli/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -32,6 +33,12 @@ func runMe(deps Dependencies, cmd *cobra.Command, _ []string) error {
 
 	if err != nil {
 		return fmt.Errorf("obter perfil: %w", err)
+	}
+	if wantsJSON(cmd) {
+		return writeJSON(out, struct {
+			User       *models.User `json:"user"`
+			OpenIssues int          `json:"openIssues"`
+		}{User: user, OpenIssues: openCount})
 	}
 
 	printer.Header("👤 Meu Perfil")

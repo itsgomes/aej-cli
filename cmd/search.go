@@ -71,6 +71,9 @@ func runSearch(deps Dependencies, cmd *cobra.Command, args []string, full bool, 
 	if err != nil {
 		return fmt.Errorf("pesquisar issues: %w", err)
 	}
+	if wantsJSON(cmd) {
+		return writeJSON(out, issues)
+	}
 
 	title := fmt.Sprintf("🔍 Resultados para \"%s\"", cli.SanitizeInline(query))
 	if query == "" {

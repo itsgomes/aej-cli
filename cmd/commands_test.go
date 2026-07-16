@@ -357,6 +357,18 @@ func TestOpenCommandBuildsJiraBrowseURL(t *testing.T) {
 	}
 }
 
+func TestIssueCommandWritesJSONWithoutDecorativeOutput(t *testing.T) {
+	t.Parallel()
+	service := &fakeService{issue: &models.Issue{Key: "AEJ-42", Fields: models.IssueFields{Summary: "JSON"}}}
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"issue", "AEJ-42", "--json"}, "")
+	if err != nil {
+		t.Fatalf("issue --json error = %v", err)
+	}
+	if !strings.Contains(stdout, `"key": "AEJ-42"`) || strings.Contains(stdout, "🎫") {
+		t.Errorf("stdout = %q", stdout)
+	}
+}
+
 func TestLoginCommandUsesInjectedAuthenticatorAndStore(t *testing.T) {
 	t.Parallel()
 

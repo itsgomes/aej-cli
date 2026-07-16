@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/itsgomes/aej-cli/internal/cli"
+	"github.com/itsgomes/aej-cli/internal/models"
 	"github.com/spf13/cobra"
 )
 
@@ -116,6 +117,14 @@ func runLogs(deps Dependencies, cmd *cobra.Command, _ []string, full bool, days 
 
 	if err != nil {
 		return fmt.Errorf("obter registros de tempo: %w", err)
+	}
+	if wantsJSON(cmd) {
+		return writeJSON(out, struct {
+			From         time.Time                    `json:"from"`
+			To           time.Time                    `json:"to"`
+			TotalSeconds int                          `json:"totalSeconds"`
+			Issues       []models.IssueWorklogSummary `json:"issues"`
+		}{period.from, period.to, totalSeconds, summaries})
 	}
 
 	printer.Header("⏱ Tempo Trabalhado — " + period.label)

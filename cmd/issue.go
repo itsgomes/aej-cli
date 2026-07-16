@@ -42,6 +42,9 @@ func runIssue(deps Dependencies, cmd *cobra.Command, args []string) error {
 
 		return fmt.Errorf("obter issue %q: %w", strings.ToUpper(args[0]), err)
 	}
+	if wantsJSON(cmd) {
+		return writeJSON(out, issue)
+	}
 
 	f := issue.Fields
 

@@ -54,6 +54,9 @@ func runMine(deps Dependencies, cmd *cobra.Command, _ []string, full bool, statu
 	if err != nil {
 		return fmt.Errorf("listar issues atribuídas: %w", err)
 	}
+	if wantsJSON(cmd) {
+		return writeJSON(out, issues)
+	}
 
 	printer.Header("📋 Minhas Issues")
 

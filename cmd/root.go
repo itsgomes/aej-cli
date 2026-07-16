@@ -25,6 +25,11 @@ func NewRootCommand(deps Dependencies) *cobra.Command {
 		false,
 		"Exibir o tempo total de execução do comando",
 	)
+	root.PersistentFlags().Bool(
+		"json",
+		false,
+		"Exibir a saída dos comandos de consulta em JSON",
+	)
 
 	root.CompletionOptions.DisableDefaultCmd = true
 

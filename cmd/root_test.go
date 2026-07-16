@@ -112,3 +112,11 @@ func TestRootCommandHasTimingFlag(t *testing.T) {
 		)
 	}
 }
+
+func TestRootCommandHasJSONFlag(t *testing.T) {
+	t.Parallel()
+	flag := NewRootCommand(defaultDependencies()).PersistentFlags().Lookup("json")
+	if flag == nil || flag.DefValue != "false" {
+		t.Fatalf("json flag = %#v, want false persistent flag", flag)
+	}
+}

@@ -101,8 +101,8 @@ type WorklogResult struct {
 }
 
 type IssueWorklogSummary struct {
-	IssueKey string
-	Summary  string
-	Total    int
-	Entries  []Worklog
+	IssueKey string    `json:"issueKey"`
+	Summary  string    `json:"summary"`
+	Total    int       `json:"totalSeconds"`
+	Entries  []Worklog `json:"entries"`
 }

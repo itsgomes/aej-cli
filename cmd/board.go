@@ -62,6 +62,9 @@ func runBoard(deps Dependencies, cmd *cobra.Command, args []string, full bool) e
 		if err != nil {
 			return fmt.Errorf("listar boards: %w", err)
 		}
+		if wantsJSON(cmd) {
+			return writeJSON(out, boards)
+		}
 
 		printer.Header("📋 Boards disponíveis")
 
@@ -96,6 +99,9 @@ func runBoard(deps Dependencies, cmd *cobra.Command, args []string, full bool) e
 			boardID,
 			err,
 		)
+	}
+	if wantsJSON(cmd) {
+		return writeJSON(out, issues)
 	}
 
 	printer.Header(fmt.Sprintf("📋 Issues do board %d", boardID))
