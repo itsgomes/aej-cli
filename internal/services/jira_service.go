@@ -23,6 +23,7 @@ type JiraGateway interface {
 	GetIssueTransitions(context.Context, string) ([]models.Transition, error)
 	TransitionIssue(context.Context, string, string) error
 	AssignIssue(context.Context, string, string) error
+	AddComment(context.Context, string, string) error
 	GetBoards(context.Context) ([]models.Board, error)
 	GetBoardIssues(context.Context, int, string, []string, int) ([]models.Issue, error)
 	AddWorklog(context.Context, string, string, string, string) error
@@ -159,6 +160,18 @@ func (s *JiraService) AssignIssueToMe(ctx context.Context, key string) (*models.
 	}
 
 	return user, nil
+}
+
+func (s *JiraService) AddComment(ctx context.Context, key, comment string) error {
+	normalizedKey, err := normalizeIssueKey(key)
+	if err != nil {
+		return err
+	}
+	comment = strings.TrimSpace(comment)
+	if comment == "" {
+		return errors.New("o comentário é obrigatório")
+	}
+	return s.client.AddComment(ctx, normalizedKey, comment)
 }
 
 func (s *JiraService) SearchIssues(ctx context.Context, query string, tag string, version string) ([]models.Issue, error) {

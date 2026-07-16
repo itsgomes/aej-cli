@@ -155,6 +155,29 @@ func TestClientAssignsIssue(t *testing.T) {
 	}
 }
 
+func TestClientAddsADFComment(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/rest/api/3/issue/AEJ-42/comment" {
+			t.Errorf("request = %s %s", r.Method, r.URL.Path)
+		}
+		var body struct {
+			Body models.ADFDocument `json:"body"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body.Body.Type != "doc" || body.Body.Content[0].Content[0].Text != "Pronto" {
+			t.Errorf("ADF body = %#v", body.Body)
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(server.Close)
+	if err := New(&config.Config{JiraURL: server.URL}).AddComment(context.Background(), "AEJ-42", "Pronto"); err != nil {
+		t.Fatalf("AddComment() error = %v", err)
+	}
+}
+
 func TestClientHonorsCanceledContext(t *testing.T) {
 	t.Parallel()
 

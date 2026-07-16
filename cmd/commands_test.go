@@ -35,6 +35,8 @@ type fakeService struct {
 	transitionID      string
 	assignIssue       string
 	assignUser        *models.User
+	commentIssue      string
+	commentText       string
 }
 
 var _ Service = (*fakeService)(nil)
@@ -67,6 +69,12 @@ func (f *fakeService) TransitionIssue(_ context.Context, issueKey, transitionID 
 func (f *fakeService) AssignIssueToMe(_ context.Context, issueKey string) (*models.User, error) {
 	f.assignIssue = issueKey
 	return f.assignUser, nil
+}
+
+func (f *fakeService) AddComment(_ context.Context, issueKey, comment string) error {
+	f.commentIssue = issueKey
+	f.commentText = comment
+	return nil
 }
 
 func (f *fakeService) SearchIssues(_ context.Context, query string, tag string, version string) ([]models.Issue, error) {
@@ -301,6 +309,21 @@ func TestAssignCommandAssignsIssueToCurrentUser(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "AEJ-42") || !strings.Contains(stdout, "Ada Lovelace") || !strings.Contains(stdout, "atribuída") {
 		t.Errorf("stdout = %q, want issue, user and success message", stdout)
+	}
+}
+
+func TestCommentCommandJoinsTextAndNormalizesKey(t *testing.T) {
+	t.Parallel()
+	service := &fakeService{}
+	stdout, _, err := executeForTest(t, testDependencies(service), []string{"comment", "aej-42", "Pronto", "para", "validar"}, "")
+	if err != nil {
+		t.Fatalf("comment error = %v", err)
+	}
+	if service.commentIssue != "AEJ-42" || service.commentText != "Pronto para validar" {
+		t.Errorf("comment = (%q, %q)", service.commentIssue, service.commentText)
+	}
+	if !strings.Contains(stdout, "Comentário adicionado") {
+		t.Errorf("stdout = %q", stdout)
 	}
 }
 

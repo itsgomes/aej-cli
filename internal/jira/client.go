@@ -292,6 +292,17 @@ func (c *Client) AssignIssue(ctx context.Context, issueKey, accountID string) er
 	return handleResponse(resp)
 }
 
+func (c *Client) AddComment(ctx context.Context, issueKey, comment string) error {
+	resp, err := c.writeHTTP.R().
+		SetContext(ctx).
+		SetBody(map[string]any{"body": buildADFComment(comment)}).
+		Post("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/comment")
+	if err != nil {
+		return fmt.Errorf("erro de rede: %w", err)
+	}
+	return handleResponse(resp)
+}
+
 func (c *Client) GetBoards(ctx context.Context) ([]models.Board, error) {
 	boards := make([]models.Board, 0, defaultPageSize)
 	startAt := 0

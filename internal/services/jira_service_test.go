@@ -40,6 +40,8 @@ type fakeJiraGateway struct {
 	transitionID      string
 	assignIssue       string
 	assignAccountID   string
+	commentIssue      string
+	commentText       string
 }
 
 var _ JiraGateway = (*fakeJiraGateway)(nil)
@@ -78,6 +80,12 @@ func (f *fakeJiraGateway) TransitionIssue(_ context.Context, issueKey, transitio
 func (f *fakeJiraGateway) AssignIssue(_ context.Context, issueKey, accountID string) error {
 	f.assignIssue = issueKey
 	f.assignAccountID = accountID
+	return nil
+}
+
+func (f *fakeJiraGateway) AddComment(_ context.Context, issueKey, comment string) error {
+	f.commentIssue = issueKey
+	f.commentText = comment
 	return nil
 }
 
@@ -198,6 +206,15 @@ func TestJiraServiceAssignIssueToMeRequiresCurrentUserAccountID(t *testing.T) {
 	}
 	if gateway.assignIssue != "" {
 		t.Errorf("AssignIssue() called with issue %q without an accountId", gateway.assignIssue)
+	}
+}
+
+func TestJiraServiceAddsNormalizedComment(t *testing.T) {
+	t.Parallel()
+	gateway := &fakeJiraGateway{}
+	err := New(gateway).AddComment(context.Background(), " aej-42 ", "  Pronto para validar  ")
+	if err != nil || gateway.commentIssue != "AEJ-42" || gateway.commentText != "Pronto para validar" {
+		t.Fatalf("AddComment() = (%v, %q, %q)", err, gateway.commentIssue, gateway.commentText)
 	}
 }
 
