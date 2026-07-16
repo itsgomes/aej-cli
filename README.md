@@ -60,6 +60,8 @@ export AEJ_API_TOKEN="your-token"
 
 Run `aej --help` to see all available commands.
 
+For a compact reference with command use cases, see [docs/commands.md](docs/commands.md).
+
 ## Notes
 
 - AEJ targets the Jira Cloud REST API v3. Jira Server and Data Center may require endpoint changes.
