@@ -1,114 +1,114 @@
-# Comandos do AEJ
+# AEJ Commands
 
-Este arquivo reúne os comandos mais comuns do `aej` com uso rápido e casos de uso mínimos.
+This file covers the most common `aej` commands, with quick usage instructions and minimal use cases.
 
-## Autenticação
+## Authentication
 
 ### `aej login`
-- Caso de uso: configurar URL do Jira, e-mail e API token.
-- Exemplo:
+- Use case: configure the Jira URL, email address, and API token.
+- Example:
   ```bash
   aej login
   ```
 
-## Consulta e acompanhamento
+## Search and tracking
 
 ### `aej me`
-- Caso de uso: ver informações do usuário atual.
-- Exemplo:
+- Use case: view information about the current user.
+- Example:
   ```bash
   aej me
   ```
 
 ### `aej mine`
-- Caso de uso: listar as últimas issues atribuídas a você.
-- Exemplo:
+- Use case: list the latest issues assigned to you.
+- Example:
   ```bash
   aej mine
-  aej mine --status "Em andamento"
+  aej mine --status "In Progress"
   ```
 
 ### `aej board`
-- Caso de uso: listar boards disponíveis ou abrir as issues de um board.
-- Exemplo:
+- Use case: list available boards or view the issues on a board.
+- Example:
   ```bash
   aej board
   aej board 1712
   aej board 1712 --full
   ```
 
-### `aej search [TERMO]`
-- Caso de uso: buscar issues por texto, tag ou versão.
-- Exemplo:
+### `aej search [TERM]`
+- Use case: search for issues by text, tag, or version.
+- Example:
   ```bash
-  aej search "bug de login"
+  aej search "login bug"
   aej search --tag backend
   aej search --version 2.1
   ```
 
-### `aej issue <CHAVE>`
-- Caso de uso: abrir os detalhes de uma issue específica.
-- Exemplo:
+### `aej issue <KEY>`
+- Use case: view the details of a specific issue.
+- Example:
   ```bash
   aej issue DEV-123
   ```
 
 ### `aej logs`
-- Caso de uso: ver o tempo trabalhado em um período.
-- Exemplo:
+- Use case: view the time worked during a given period.
+- Example:
   ```bash
   aej logs
   aej logs --days 15
   aej logs --date 16-07-2026
   ```
 
-## Ações em issues
+## Issue actions
 
-### `aej assign <CHAVE>`
-- Caso de uso: atribuir uma issue a você, a outro usuário ou remover o responsável.
-- Exemplo:
+### `aej assign <KEY>`
+- Use case: assign an issue to yourself or another user, or remove the assignee.
+- Example:
   ```bash
   aej assign DEV-123
-  aej assign DEV-123 --to usuario@empresa.com
+  aej assign DEV-123 --to user@company.com
   aej assign DEV-123 --unassign
   ```
 
-### `aej transition <CHAVE>`
-- Caso de uso: alterar o status de uma issue por seleção interativa.
-- Exemplo:
+### `aej transition <KEY>`
+- Use case: change an issue's status through an interactive selection.
+- Example:
   ```bash
   aej transition DEV-123
   ```
 
-### `aej comment <CHAVE> <COMENTÁRIO>`
-- Caso de uso: adicionar um comentário em uma issue.
-- Exemplo:
+### `aej comment <KEY> <COMMENT>`
+- Use case: add a comment to an issue.
+- Example:
   ```bash
-  aej comment DEV-123 "Correção disponível para validação"
+  aej comment DEV-123 "Fix available for validation"
   ```
 
-### `aej open <CHAVE>`
-- Caso de uso: abrir a issue diretamente no navegador.
-- Exemplo:
+### `aej open <KEY>`
+- Use case: open an issue directly in the browser.
+- Example:
   ```bash
   aej open DEV-123
   ```
 
-### `aej log <CHAVE> <TEMPO> [COMENTÁRIO]`
-- Caso de uso: registrar tempo gasto em uma issue.
-- Exemplo:
+### `aej log <KEY> <TIME> [COMMENT]`
+- Use case: log time spent on an issue.
+- Example:
   ```bash
   aej log DEV-123 2h
-  aej log DEV-123 30m "Revisão de código"
-  aej log DEV-123 "1h 30m" "Implementando feature"
+  aej log DEV-123 30m "Code review"
+  aej log DEV-123 "1h 30m" "Implementing feature"
   ```
 
-## Flags globais
+## Global flags
 
-- `--json`: retorna a saída em JSON.
-- `--timing`: mostra o tempo total de execução.
+- `--json`: returns the output as JSON.
+- `--timing`: shows the total execution time.
 
-Exemplo:
+Example:
 
 ```bash
 aej issue DEV-123 --json
